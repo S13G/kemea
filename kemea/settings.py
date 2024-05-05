@@ -1,4 +1,3 @@
-
 from datetime import timedelta
 from pathlib import Path
 
@@ -11,7 +10,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = config('SRCRET_KEY')
+SECRET_KEY = config('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -34,6 +33,7 @@ LOCAL_APPS = [
     'apps.common.apps.CommonConfig',
     'apps.property.apps.PropertyConfig',
     'apps.notification.apps.NotificationConfig',
+    'apps.social_auth.apps.SocialAuthConfig',
 ]
 
 THIRD_PARTY_APPS = [

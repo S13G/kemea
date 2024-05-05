@@ -56,7 +56,8 @@ class PropertyAdmin(admin.ModelAdmin):
         'discount',
         'discounted_price',
         'name_of_lister',
-        'ad_status'
+        'ad_status',
+        'terminated',
     )
     list_filter = ('ad_status',)
     list_per_page = 20

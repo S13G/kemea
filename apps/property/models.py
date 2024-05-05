@@ -4,7 +4,7 @@ from django.db import models
 from apps.common.models import BaseModel
 from apps.core.validators import validate_phone_number
 from apps.property.choices import AD_STATUS, PENDING
-from apps.property.managers import PropertyManager
+from apps.property.managers import PropertyManager, FavoritePropertyManager
 
 User = get_user_model()
 
@@ -89,6 +89,11 @@ class PropertyMedia(BaseModel):
 class FavoriteProperty(BaseModel):
     property = models.ForeignKey(Property, on_delete=models.CASCADE, related_name='favorite_property')
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='favorite_property_user')
+
+    objects = FavoritePropertyManager()
+
+    class Meta:
+        unique_together = ('property', 'user')
 
     def __str__(self):
         return self.user.full_name

@@ -2,18 +2,22 @@ from django.db import transaction
 from django.db.models import OuterRef, Subquery
 from django.db.models.functions import Coalesce
 from django_filters.rest_framework import DjangoFilterBackend
-from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiResponse, OpenApiTypes
+from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiResponse, OpenApiTypes, OpenApiExample
 from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
+from apps.common.errors import ErrorCode
+from apps.common.exceptions import RequestError
 from apps.common.permissions import IsAuthenticatedAgent
 from apps.common.responses import CustomResponse
 from apps.core.serializers import AgentProfileSerializer
 from apps.property.choices import APPROVED
 from apps.property.filters import AdFilter
-from apps.property.models import Property, AdCategory, PropertyType, PropertyState, PropertyFeature, PropertyMedia
+from apps.property.models import Property, AdCategory, PropertyType, PropertyState, PropertyFeature, PropertyMedia, \
+    FavoriteProperty
 from apps.property.selectors import get_dashboard_details, terminate_property_ad, get_searched_property_ads, \
-    get_property, update_property, get_agent_profile
+    get_property_for_user, update_property, get_agent_profile, get_favorite_properties, get_single_property
 from apps.property.serializers import CreatePropertyAdSerializer, PropertyAdSerializer
 
 
@@ -28,6 +32,18 @@ class RetrieveAgentDashboardView(APIView):
         This endpoint allows an authenticated agent to view their dashboard that contains their active property ads
         """,
         tags=['Agent Dashboard'],
+        responses={
+            status.HTTP_200_OK: OpenApiResponse(
+                description="Successfully retrieved agent dashboard",
+                response={"application/json"},
+                examples=[
+                    OpenApiExample(
+                        name="Success response",
+                        value={}
+                    )
+                ]
+            )
+        }
     )
     def get(self, request):
         full_name = request.user.full_name
@@ -229,7 +245,7 @@ class RetrieveUpdateDeletePropertyAdView(APIView):
     )
     def get(self, request, *args, **kwargs):
         property_id = kwargs.get('id')
-        property_ad = get_property(request.user, property_id=property_id)
+        property_ad = get_property_for_user(request.user, property_id=property_id)
         serialized_data = PropertyAdSerializer(property_ad).data
         return CustomResponse.success(message="Successfully retrieved property ad", data=serialized_data)
 
@@ -244,7 +260,7 @@ class RetrieveUpdateDeletePropertyAdView(APIView):
     @transaction.atomic
     def patch(self, request, *args, **kwargs):
         property_id = kwargs.get('id')
-        property_ad = get_property(request.user, property_id=property_id)
+        property_ad = get_property_for_user(request.user, property_id=property_id)
 
         serializer = self.serializer_class(data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
@@ -270,7 +286,7 @@ class RetrieveUpdateDeletePropertyAdView(APIView):
     @transaction.atomic
     def delete(self, request, *args, **kwargs):
         property_id = kwargs.get('id')
-        property_ad = get_property(request.user, property_id=property_id)
+        property_ad = get_property_for_user(request.user, property_id=property_id)
         property_ad.delete()
         return CustomResponse.success(message="Successfully deleted property ad",
                                       status_code=status.HTTP_204_NO_CONTENT)
@@ -289,7 +305,17 @@ class RetrieveUpdateAgentProfileView(APIView):
         """,
         tags=['Agent Profile'],
         parameters=[
-            OpenApiParameter()
+            OpenApiParameter(name='property_type', description="Type of property", required=False,
+                             type=OpenApiTypes.STR),
+            OpenApiParameter(name='price_min', description="Minimum price", required=False, type=OpenApiTypes.FLOAT),
+            OpenApiParameter(name='price_max', description="Maximum price", required=False, type=OpenApiTypes.FLOAT),
+            OpenApiParameter(name='surface_build_min', description="Minimum surface price", required=False,
+                             type=OpenApiTypes.FLOAT),
+            OpenApiParameter(name='surface_build_max', description="Maximum surface price", required=False,
+                             type=OpenApiTypes.FLOAT),
+            OpenApiParameter(name='rooms', description="Number of rooms", required=False, type=OpenApiTypes.INT),
+            OpenApiParameter(name='floors', description="Number of floors", required=False, type=OpenApiTypes.INT),
+            OpenApiParameter(name='features', description="Features", required=False, type=OpenApiTypes.STR),
         ]
     )
     def get(self, request):
@@ -331,4 +357,92 @@ class RetrieveUpdateAgentProfileView(APIView):
         """,
         tags=['Agent Profile'],
     )
+    @transaction.atomic
+    def patch(self, request):
+        user = request.user
+        agent_profile = get_agent_profile(user=user)
+        serializer = self.serializer_class(agent_profile, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
 
+        serialized_data = self.serializer_class(serializer.save()).data
+        return CustomResponse.success(message="Successfully updated agent profile", data=serialized_data,
+                                      status_code=status.HTTP_202_ACCEPTED)
+
+
+"""
+REGISTERED USERS
+"""
+
+
+class RetrieveCreateDeleteFavoritePropertyView(APIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = PropertyAdSerializer
+
+    @extend_schema(
+        summary="Retrieve all favorite properties",
+        description="""
+        This endpoint allows an authenticated agent to retrieve all their favorite properties
+        """,
+        tags=['Favorites'],
+    )
+    def get(self, request):
+        user = request.user
+        property_ads = get_favorite_properties(user=user)
+        serialized_data = PropertyAdSerializer(property_ads, many=True).data
+        return CustomResponse.success(message="Successfully retrieved favorite properties", data=serialized_data)
+
+    @extend_schema(
+        summary="Add property to favorite properties",
+        description="""
+        This endpoint allows an authenticated user to add a property to their favorite properties
+        """,
+        tags=['Favorites'],
+    )
+    @transaction.atomic
+    def post(self, request, *args, **kwargs):
+        user = request.user
+        property_id = kwargs.get('id')
+        property_ad = get_single_property(property_id=property_id)
+
+        # Create property object
+        FavoriteProperty.objects.create(property=property_ad, user=user)
+        return CustomResponse.success(message="Successfully added property to favorite properties")
+
+    @extend_schema(
+        summary="Delete property from favorite properties",
+        description="""
+        This endpoint allows an authenticated user to delete a property from their favorite properties
+        """,
+        tags=['Favorites'],
+    )
+    def delete(self, request, *args, **kwargs):
+        user = request.user
+        property_id = kwargs.get('id')
+        property_ad = get_single_property(property_id=property_id)
+
+        try:
+            FavoriteProperty.objects.get(property=property_ad, user=user).delete()
+        except FavoriteProperty.DoesNotExist:
+            raise RequestError(err_code=ErrorCode.NON_EXISTENT, err_msg="Property not found",
+                               status_code=status.HTTP_404_NOT_FOUND)
+
+        return CustomResponse.success(message="Successfully deleted property from favorite properties")
+
+
+class RetrievePropertyAdDetailsView(APIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = CreatePropertyAdSerializer
+
+    @extend_schema(
+        summary="Retrieve property ad details",
+        description="""
+            This endpoint allows an authenticated user to retrieve a property ad details
+            """,
+        tags=['Agent Dashboard'],
+    )
+    def get(self, request, *args, **kwargs):
+        property_id = kwargs.get('id')
+        property_ad = get_single_property(property_id=property_id)
+
+        serialized_data = PropertyAdSerializer(property_ad).data
+        return CustomResponse.success(message="Successfully retrieved property ad", data=serialized_data)

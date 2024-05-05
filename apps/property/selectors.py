@@ -4,7 +4,7 @@ from rest_framework import status
 from apps.common.errors import ErrorCode
 from apps.common.exceptions import RequestError
 from apps.core.models import AgentProfile
-from apps.property.models import Property, PropertyMedia
+from apps.property.models import Property, PropertyMedia, FavoriteProperty
 
 
 def get_dashboard_details(user):
@@ -33,7 +33,7 @@ def get_searched_property_ads(user, search):
                                                                 'ad_category__name', 'ad_status').order_by('-created')
 
 
-def get_property(user, property_id):
+def get_property_for_user(user, property_id):
     try:
         return Property.objects.get(lister=user, id=property_id)
     except Property.DoesNotExist:
@@ -43,7 +43,7 @@ def get_property(user, property_id):
 
 def get_property_media(item_id, property_ad):
     try:
-        return PropertyMedia.objects.get(id=item_id, property=property_ad)
+        return PropertyMedia.objects.select_related('property').get(id=item_id, property=property_ad)
     except PropertyMedia.DoesNotExist:
         raise RequestError(err_code=ErrorCode.NON_EXISTENT, err_msg="Property not found",
                            status_code=status.HTTP_404_NOT_FOUND)
@@ -70,7 +70,19 @@ def update_property(serialized_data, property_ad, media_data):
 
 def get_agent_profile(user):
     try:
-        return AgentProfile.objects.get(user=user)
+        return AgentProfile.objects.select_related('user').get(user=user)
     except AgentProfile.DoesNotExist:
         raise RequestError(err_code=ErrorCode.NON_EXISTENT, err_msg="Agent profile not found",
+                           status_code=status.HTTP_404_NOT_FOUND)
+
+
+def get_favorite_properties(user):
+    return FavoriteProperty.objects.filter(lister=user)
+
+
+def get_single_property(property_id):
+    try:
+        return Property.objects.get(id=property_id)
+    except Property.DoesNotExist:
+        raise RequestError(err_code=ErrorCode.NON_EXISTENT, err_msg="Property not found",
                            status_code=status.HTTP_404_NOT_FOUND)
