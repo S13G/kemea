@@ -1,31 +1,64 @@
 from datetime import timedelta
 
-from django.contrib.auth import get_user_model
-from django.db.models import Q
+from django.contrib.auth import get_user_model, authenticate
 from django.utils import timezone
 from rest_framework import status
 
 from apps.common.errors import ErrorCode
 from apps.common.exceptions import RequestError
-from apps.core.models import OTPSecret, Profile, Referral
+from apps.common.responses import CustomResponse
+from apps.core.models import OTPSecret
+from apps.core.serializers import AgentProfileSerializer, NormalProfileSerializer
 
 User = get_user_model()
 
 
-def authenticate(email_or_username=None, password=None):
+def authenticate_user(email, password):
+    user = authenticate(email=email, password=password)
+    if user is None:
+        raise RequestError(err_code=ErrorCode.INVALID_CREDENTIALS, err_msg="Invalid credentials",
+                           status_code=status.HTTP_401_UNAUTHORIZED)
+    return user
+
+
+def check_email_verification(user):
+    if not user.email_verified:
+        raise RequestError(err_code=ErrorCode.UNVERIFIED_USER, err_msg="Verify your email first",
+                           status_code=status.HTTP_400_BAD_REQUEST)
+
+
+def get_user_profile(user, is_agent):
+    if is_agent:
+        return AgentProfileSerializer(user.agent_profile)
+    else:
+        # Assuming you have a different serializer for non-agent users
+        return NormalProfileSerializer(user.profile)
+
+
+def generate_response(user, user_profile):
+    response_data = {"tokens": user.tokens(), "profile_data": user_profile.data}
+    return CustomResponse.success(message="Logged in successfully", data=response_data)
+
+
+def get_existing_user(email):
+    # Check if a user with the specified email exists
     try:
-        user = User.objects.filter(Q(username__iexact=email_or_username) | Q(email__iexact=email_or_username)).get()
-        if user.check_password(password) and user.is_active:
-            return user
+        user = User.objects.get(email=email)
     except User.DoesNotExist:
-        return None
+        return None  # User does not exist
 
+    # User exists; handle different scenarios based on user profile
+    if user.is_agent:
+        error_msg = "Account already exists and has an agent profile"
+    else:
+        error_msg = "Account already exists and has a normal profile"
 
-def get_existing_user(email, username=None):
-    if User.objects.filter(Q(email=email) | Q(username=username)).exists():
-        raise RequestError(err_code=ErrorCode.ALREADY_EXISTS,
-                           err_msg=f"Account already exists",
-                           status_code=status.HTTP_409_CONFLICT)
+    # Raise a RequestError with appropriate error code and message
+    raise RequestError(
+        err_code=ErrorCode.ALREADY_EXISTS,
+        err_msg=error_msg,
+        status_code=status.HTTP_409_CONFLICT
+    )
 
 
 def get_user(email):
@@ -69,28 +102,3 @@ def validate_otp_secret_code(user, code):
     except OTPSecret.DoesNotExist:
         raise RequestError(err_code=ErrorCode.NON_EXISTENT, err_msg="No OTP found for this account",
                            status_code=status.HTTP_404_NOT_FOUND)
-
-
-def get_profile(user):
-    try:
-        return Profile.objects.select_related('user').get(user=user)
-    except Profile.DoesNotExist:
-        raise RequestError(err_code=ErrorCode.NON_EXISTENT, err_msg="No profile found for this user",
-                           status_code=status.HTTP_404_NOT_FOUND)
-
-
-def get_referral_code_owner(referral_code):
-    return User.objects.get(referral_code=referral_code)
-
-
-def award_referral_tokens(referral_code_owner, new_user):
-    try:
-        referral = Referral.objects.get(user=referral_code_owner)
-        referral.earnings += 1000
-        referral.num_of_referrals += 1
-        referral.save()
-    except Referral.DoesNotExist:
-        print('create')
-        Referral.objects.create(user=referral_code_owner, earnings=1000, num_of_referrals=1)
-    new_user.profile.tokens += 500
-    new_user.profile.save()

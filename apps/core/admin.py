@@ -20,11 +20,12 @@ class GroupAdmin(BaseGroupAdmin):
 class UserAdmin(BaseUserAdmin):
     list_display = (
         "full_name",
-        "username",
         "email",
+        "phone_number",
         "email_verified",
         "is_staff",
         "is_active",
+        "is_agent",
 
     )
     list_editable = (
@@ -42,10 +43,9 @@ class UserAdmin(BaseUserAdmin):
             {
                 "fields": (
                     "full_name",
-                    "username",
                     "email",
+                    "phone_number",
                     "password",
-                    "avatar",
                 )
             },
         ),
@@ -56,6 +56,7 @@ class UserAdmin(BaseUserAdmin):
                     "google_provider",
                     "is_active",
                     "is_staff",
+                    "is_agent",
                     "email_verified",
                     "groups",
                     "user_permissions"
@@ -93,17 +94,15 @@ class UserAdmin(BaseUserAdmin):
     ordering = ("email",)
 
 
-@admin.register(Profile)
-class ProfileAdmin(admin.ModelAdmin):
+@admin.register(NormalProfile)
+class NormalProfileAdmin(admin.ModelAdmin):
     fieldsets = [
         (
             'Profile Information', {
                 'fields': [
-                    'avatar',
+                    'user',
+                    'image',
                     'date_of_birth',
-                    'phone_number',
-                    'followers',
-                    'tokens'
                 ],
             }
         ),
@@ -112,19 +111,59 @@ class ProfileAdmin(admin.ModelAdmin):
         'full_name',
         'phone_number',
         'date_of_birth',
-        'followers',
-        'tokens'
     )
     list_per_page = 20
     search_fields = (
         'phone_number',
-        'followers',
-        'tokens'
     )
 
     @admin.display(description='Full name')
     def full_name(self, obj):
         return obj.user.full_name
+
+    @admin.display(description='Phone_number')
+    def phone_number(self, obj):
+        return obj.user.phone_number
+
+
+@admin.register(AgentProfile)
+class AgentProfileAdmin(admin.ModelAdmin):
+    fieldsets = [
+        (
+            'Profile Information', {
+                'fields': [
+                    'user',
+                    'company_name',
+                    'license_number',
+                    'image',
+                    'background_image',
+                    'location',
+                    'website',
+                ],
+            }
+        ),
+    ]
+    list_display = (
+        'full_name',
+        'company_name',
+        'phone_number',
+        'location',
+        'website',
+    )
+    list_per_page = 20
+    search_fields = (
+        'company_name',
+        'location',
+        'website',
+    )
+
+    @admin.display(description='Full name')
+    def full_name(self, obj):
+        return obj.user.full_name
+
+    @admin.display(description='Phone_number')
+    def phone_number(self, obj):
+        return obj.user.phone_number
 
 
 admin.site.register(User, UserAdmin)

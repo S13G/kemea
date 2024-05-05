@@ -25,9 +25,10 @@ urlpatterns = [
     path('change/forgot-password/<str:token>', views.ChangeForgottenPasswordView.as_view(),
          name="change-forgotten-password"),
     path('change/new-password', views.ChangePasswordView.as_view(), name="change-password"),
-    path('create-account', views.RegistrationView.as_view(), name="registration"),
-    path('profile/details', views.RetrieveUpdateDeleteProfileView.as_view(),
+    path('user-account/create', views.NormalRegistrationView.as_view(), name="normal-user-registration"),
+    path('agent-account/create', views.AgentRegistrationView.as_view(), name="agent-user-registration"),
+    path('user-profile/details', views.RetrieveUpdateDeleteProfileView.as_view(),
          name="get-update-delete-profile"),
-    path('profile/deactivate', views.DeactivateAccountView.as_view(), name="deactivate-account"),
-    path('profile/referrals', views.GetReferralInfoView.as_view(), name="referrals")
+    path('agent-profile/details', views.RetrieveUpdateDeleteAgentProfileView.as_view(),
+         name="get-update-delete-agent-profile"),
 ]
