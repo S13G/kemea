@@ -15,7 +15,7 @@ urlpatterns = [
     path('create/ad', CreatePropertyAdView.as_view(), name='create-property-ad'),
     path('retrieve/update/delete/ad/<str:id>', RetrieveUpdateDeletePropertyAdView.as_view(),
          name='retrieve-update-property-ad'),
-    path('retrieve/update/delete/agent', RetrieveUpdateAgentProfileView.as_view(), name='retrieve-update-delete-agent'),
+    path('agent-profile/details', RetrieveUpdateAgentProfileView.as_view(), name='retrieve-update-delete-agent'),
     path('favorite/properties', RetrieveCreateDeleteFavoritePropertyView.as_view(),
          name='retrieve-create-update-favorite-property'),
     path('details', RetrievePropertyAdDetailsView.as_view(), name='property-ad-details'),

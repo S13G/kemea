@@ -17,6 +17,12 @@ def get_dashboard_details(user):
 def terminate_property_ad(user, ad_id):
     try:
         property_ad = Property.objects.get(lister=user, id=ad_id)
+
+        # if the ad has already been terminated
+        if property_ad.terminated:
+            raise RequestError(err_code=ErrorCode.NOT_ALLOWED, err_msg="Ad already terminated",
+                               status_code=status.HTTP_400_BAD_REQUEST)
+
         property_ad.terminated = True
         property_ad.save()
     except Property.DoesNotExist:

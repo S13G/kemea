@@ -11,7 +11,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenBlacklistVi
 
 from apps.common.errors import ErrorCode
 from apps.common.exceptions import RequestError
-from apps.common.permissions import IsAuthenticatedUser, IsAuthenticatedAgent
+from apps.common.permissions import IsAuthenticatedUser
 from apps.common.responses import CustomResponse
 from apps.core.emails import send_otp_email
 from apps.core.models import NormalProfile, AgentProfile
@@ -112,7 +112,7 @@ class AgentRegistrationView(APIView):
         responses={
             status.HTTP_201_CREATED: OpenApiResponse(
                 description="Registration successful, check your email for verification.",
-                response=NormalProfileSerializer,
+                response=AgentProfileSerializer,
             ),
             status.HTTP_409_CONFLICT: OpenApiResponse(
                 response={"application/json"},
@@ -533,7 +533,7 @@ class LoginView(TokenObtainPairView):
                 description="Logged in successfully",
                 examples=[
                     OpenApiExample(
-                        name="Successful response",
+                        name="Agent response",
                         value={
                             "status": "success",
                             "message": "Logged in successfully",
@@ -543,16 +543,39 @@ class LoginView(TokenObtainPairView):
                                     "refresh": "refresh token",
                                 },
                                 "profile_data": {
-                                    "user_id": "9022f682-201e-4391-9133-d5cfca96cebf",
-                                    "id": "2775f14e-802a-43bd-b0a3-a9635207851a",
-                                    "full_name": "Pala",
-                                    "username": "doe",
-                                    "date_of_birth": "",
-                                    "email": "admin@gmail.com",
-                                    "avatar": "",
-                                    "referral_code": "15KHZHYN7P",
-                                    "followers": 0,
-                                    "tokens": 100000
+                                    "user_id": "59af4ef1-8e58-47cf-9f1a-e7bae786b883",
+                                    "id": "542ee57a-7a5e-4332-a9a7-4de9a775e570",
+                                    "full_name": "John Doe",
+                                    "company_name": "Doecomp",
+                                    "email": "ayflix0@gmail.com",
+                                    "image": "",
+                                    "background_image": "",
+                                    "phone_number": "+2348099691398",
+                                    "license_number": "121234575",
+                                    "location": "",
+                                    "website": ""
+                                }
+                            }
+                        }
+                    ),
+                    OpenApiExample(
+                        name="Normal response",
+                        value={
+                            "status": "success",
+                            "message": "Logged in successfully",
+                            "data": {
+                                "tokens": {
+                                    "access": "token",
+                                    "refresh": "refresh token",
+                                },
+                                "profile_data": {
+                                    "user_id": "59af4ef1-8e58-47cf-9f1a-e7bae786b883",
+                                    "id": "542ee57a-7a5e-4332-a9a7-4de9a775e570",
+                                    "full_name": "Doe",
+                                    "email": "a@gmail.com",
+                                    "phone_number": "+2348099691398",
+                                    "image": "",
+                                    "date_of_birth": "2024-10-05"
                                 }
                             }
                         }
@@ -943,7 +966,7 @@ NORMAL PROFILE
 """
 
 
-class RetrieveUpdateDeleteProfileView(APIView):
+class RetrieveUpdateProfileView(APIView):
     permission_classes = (IsAuthenticatedUser,)
     serializer_class = NormalProfileSerializer
 
@@ -1036,164 +1059,3 @@ class RetrieveUpdateDeleteProfileView(APIView):
         updated = self.serializer_class(update_profile.save()).data
         return CustomResponse.success(message="Updated profile successfully", data=updated,
                                       status_code=status.HTTP_202_ACCEPTED)
-
-    @extend_schema(
-        summary="Delete user profile",
-        description=
-        """
-        This endpoint allows a user to delete his/her user profile.
-        """,
-        tags=['Normal Profile'],
-        responses={
-            status.HTTP_204_NO_CONTENT: OpenApiResponse(
-                description="Deleted successfully",
-                response={'application/json'},
-                examples=[
-                    OpenApiExample(
-                        name="Normal profile response",
-                        value={
-                            "status": "success",
-                            "message": "Deleted successfully"
-                        }
-                    )
-                ]
-            )
-        }
-    )
-    def delete(self, request):
-        user = request.user
-        NormalProfile.objects.select_related('user').get(user=user).delete()
-        return CustomResponse.success(message="Deleted successfully")
-
-
-"""
-AGENT PROFILE
-"""
-
-
-class RetrieveUpdateDeleteAgentProfileView(APIView):
-    permission_classes = (IsAuthenticatedAgent,)
-    serializer_class = AgentProfileSerializer
-
-    @extend_schema(
-        summary="Retrieve agent profile",
-        description=
-        """
-        This endpoint allows a user to retrieve his/her agent profile.
-        Note: Also use this endpoint for the admin section too for the user section
-        """,
-        tags=['Agent Profile'],
-        responses={
-            status.HTTP_200_OK: OpenApiResponse(
-                description="Fetched successfully",
-                response={'application/json'},
-                examples=[
-                    OpenApiExample(
-                        name="Normal profile response",
-                        value={
-                            "status": "success",
-                            "message": "Retrieved profile successfully",
-                            "data": {
-                                "user_id": "0cf8dd0c-29ca-4b95-a9c7-529993d3891f",
-                                "id": "0a445bca-a6d0-427e-9f36-da780132d0db",
-                                "full_name": "John Doe",
-                                "company_name": "Corpoann",
-                                "email": "ayflix@gmail.com",
-                                "image": "",
-                                "background_image": "",
-                                "phone_number": "+23345662323",
-                                "license_number": "2323232424",
-                                "location": "",
-                                "website": ""
-                            }
-                        }
-                    )
-                ]
-            )
-        }
-    )
-    def get(self, request):
-        user = self.request.user
-        try:
-            agent_profile = AgentProfile.objects.select_related('user').get(user=user)
-        except AgentProfile.DoesNotExist:
-            raise RequestError(err_code=ErrorCode.NON_EXISTENT, err_msg="No profile found for this user",
-                               status_code=status.HTTP_404_NOT_FOUND)
-
-        serialized_data = self.serializer_class(agent_profile, context={"request": request}).data
-        return CustomResponse.success(message="Retrieved profile successfully", data=serialized_data)
-
-    @extend_schema(
-        summary="Update agent profile",
-        description=
-        """
-        This endpoint allows a user to update his/her agent profile.
-        """,
-        tags=['Agent Profile'],
-        responses={
-            status.HTTP_202_ACCEPTED: OpenApiResponse(
-                description="Updated successfully",
-                response={'application/json'},
-                examples=[
-                    OpenApiExample(
-                        name="Normal profile response",
-                        value={
-                            "status": "success",
-                            "message": "Retrieved profile successfully",
-                            "data": {
-                                "user_id": "0cf8dd0c-29ca-4b95-a9c7-529993d3891f",
-                                "id": "0a445bca-a6d0-427e-9f36-da780132d0db",
-                                "full_name": "John Doe",
-                                "company_name": "Corpoann",
-                                "email": "ayflix@gmail.com",
-                                "image": "",
-                                "background_image": "",
-                                "phone_number": "+23345662323",
-                                "license_number": "2323232424",
-                                "location": "",
-                                "website": ""
-                            }
-                        }
-                    )
-                ]
-            )
-        }
-    )
-    @transaction.atomic()
-    def patch(self, request):
-        user = request.user
-        agent_profile = AgentProfile.objects.select_related('user').get(user=user)
-        update_profile = self.serializer_class(agent_profile, data=self.request.data, partial=True, )
-
-        update_profile.is_valid(raise_exception=True)
-        updated = self.serializer_class(update_profile.save()).data
-        return CustomResponse.success(message="Updated profile successfully", data=updated,
-                                      status_code=status.HTTP_202_ACCEPTED)
-
-    @extend_schema(
-        summary="Delete agent profile",
-        description=
-        """
-        This endpoint allows a user to delete his/her agent profile.
-        """,
-        tags=['Agent Profile'],
-        responses={
-            status.HTTP_204_NO_CONTENT: OpenApiResponse(
-                description="Deleted successfully",
-                response={'application/json'},
-                examples=[
-                    OpenApiExample(
-                        name="Normal profile response",
-                        value={
-                            "status": "success",
-                            "message": "Deleted successfully"
-                        }
-                    )
-                ]
-            )
-        }
-    )
-    def delete(self, request):
-        user = request.user
-        AgentProfile.objects.select_related('user').get(user=user).delete()
-        return CustomResponse.success(message="Deleted successfully", status_code=status.HTTP_204_NO_CONTENT)

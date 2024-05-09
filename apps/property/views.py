@@ -66,6 +66,35 @@ class TerminatePropertyAdView(APIView):
         This endpoint allows an authenticated agent to terminate an active property ad
         """,
         tags=['Agent Dashboard'],
+        responses={
+            status.HTTP_200_OK: OpenApiResponse(
+                response={'application/json'},
+                description="Successfully terminated property ad",
+                examples=[
+                    OpenApiExample(
+                        name="Success response",
+                        value={
+                            "status": "success",
+                            "message": "Successfully terminated property ad"
+                        }
+                    )
+                ]
+            ),
+            status.HTTP_400_BAD_REQUEST: OpenApiResponse(
+                response={'application/json'},
+                description="Ad already terminated",
+                examples=[
+                    OpenApiExample(
+                        name="Bad request",
+                        value={
+                            "status": "failure",
+                            "message": "Ad already terminated",
+                            "code": "not_allowed"
+                        }
+                    )
+                ]
+            )
+        }
     )
     def get(self, request, *args, **kwargs):
         property_ad_id = kwargs.get('property_id')
@@ -104,8 +133,7 @@ class RetrieveFilteredAdsView(APIView):
                 "This endpoint allows an authenticated normal user to filter properties."
         ),
         parameters=[
-            OpenApiParameter(name="ad_category", description="Type of property ad", required=False,
-                             type=OpenApiTypes.STR),
+            OpenApiParameter(name="ad_category", description="Type of property ad", required=False),
         ],
         tags=['Property'],
         responses={
@@ -115,7 +143,7 @@ class RetrieveFilteredAdsView(APIView):
         }
     )
     def get(self, request):
-        queryset = Property.objects.only('id', 'name', 'property_type__name',
+        queryset = Property.objects.only('id', 'lister', 'name', 'property_state__name', 'property_type__name',
                                          'ad_category__name', 'ad_status')
         filtered_queryset = self.filterset_class(request.GET, queryset=queryset).qs.order_by('-created')
         total_items = filtered_queryset.count()
@@ -139,12 +167,40 @@ class RetrieveAdCategoriesView(APIView):
         responses={
             status.HTTP_200_OK: OpenApiResponse(
                 description="Successfully retrieved ad categories",
+                response={'application/json'},
+                examples=[
+                    OpenApiExample(
+                        name="Success response",
+                        value={
+                            "status": "success",
+                            "message": "Successfully retrieved ad categories",
+                            "data": [
+                                {
+                                    "id": "057dc877-064b-449a-a178-35d02cf80aa1",
+                                    "name": "Buy"
+                                },
+                                {
+                                    "id": "5680d436-a4b0-4970-badd-deb735f8dbb4",
+                                    "name": "Rent"
+                                }
+                            ]
+                        }
+                    )
+                ]
             )
         }
     )
     def get(self, request):
         ad_categories = AdCategory.objects.all()
-        return CustomResponse.success(message="Successfully retrieved ad categories", data=list(ad_categories))
+
+        data = [
+            {
+                "id": category.id,
+                "name": category.name
+            }
+            for category in ad_categories
+        ]
+        return CustomResponse.success(message="Successfully retrieved ad categories", data=data)
 
 
 class RetrievePropertyTypeView(APIView):
@@ -159,12 +215,44 @@ class RetrievePropertyTypeView(APIView):
         responses={
             status.HTTP_200_OK: OpenApiResponse(
                 description="Successfully retrieved property types",
+                response={'application/json'},
+                examples=[
+                    OpenApiExample(
+                        name="Success response",
+                        value={
+                            "status": "success",
+                            "message": "Successfully retrieved property types",
+                            "data": [
+                                {
+                                    "id": "68d42228-703f-4f8c-8843-6ebc452198a7",
+                                    "name": "Villa"
+                                },
+                                {
+                                    "id": "6aec02ba-8c5c-445d-bca4-6d3a555095b5",
+                                    "name": "Apartment"
+                                },
+                                {
+                                    "id": "6501bbd6-c66d-440b-9b9d-38d18547dbfa",
+                                    "name": "House"
+                                }
+                            ]
+                        }
+                    )
+                ]
             )
         }
     )
     def get(self, request):
         property_types = PropertyType.objects.all()
-        return CustomResponse.success(message="Successfully retrieved property types", data=list(property_types))
+
+        data = [
+            {
+                "id": property_type.id,
+                "name": property_type.name
+            }
+            for property_type in property_types
+        ]
+        return CustomResponse.success(message="Successfully retrieved property types", data=data)
 
 
 class RetrievePropertyStateView(APIView):
@@ -179,12 +267,44 @@ class RetrievePropertyStateView(APIView):
         responses={
             status.HTTP_200_OK: OpenApiResponse(
                 description="Successfully retrieved property states",
+                response={'application/json'},
+                examples=[
+                    OpenApiExample(
+                        name="Success response",
+                        value={
+                            "status": "success",
+                            "message": "Successfully retrieved property states",
+                            "data": [
+                                {
+                                    "id": "37b76a58-1d46-4799-9d18-ec66d816effc",
+                                    "name": "Good condition"
+                                },
+                                {
+                                    "id": "22f06048-4afc-4cb1-accc-66580c0618ec",
+                                    "name": "New"
+                                },
+                                {
+                                    "id": "c3b37a05-3978-452d-b118-35ec6e754613",
+                                    "name": "Renovated"
+                                }
+                            ]
+                        }
+                    )
+                ]
             )
         }
     )
     def get(self, request):
         property_states = PropertyState.objects.all()
-        return CustomResponse.success(message="Successfully retrieved property states", data=list(property_states))
+
+        data = [
+            {
+                "id": property_state.id,
+                "name": property_state.name
+            }
+            for property_state in property_states
+        ]
+        return CustomResponse.success(message="Successfully retrieved property states", data=data)
 
 
 class RetrievePropertyFeaturesView(APIView):
@@ -199,12 +319,64 @@ class RetrievePropertyFeaturesView(APIView):
         responses={
             status.HTTP_200_OK: OpenApiResponse(
                 description="Successfully retrieved property features",
+                response={'application/json'},
+                examples=[
+                    OpenApiExample(
+                        name="Success response",
+                        value={
+                            "status": "success",
+                            "message": "Successfully retrieved property features",
+                            "data": [
+                                {
+                                    "id": "7d288e86-0db7-486e-b80a-106f267f0ffe",
+                                    "name": "Storeroom"
+                                },
+                                {
+                                    "id": "c6e1f24f-c7ee-417b-85d8-3e9baac54874",
+                                    "name": "Terrace"
+                                },
+                                {
+                                    "id": "dab34afa-5a47-4834-8838-3e443d0818ed",
+                                    "name": "Pool"
+                                },
+                                {
+                                    "id": "3e6e7296-3ca4-4757-a252-ce0f34452162",
+                                    "name": "Garden"
+                                },
+                                {
+                                    "id": "cf4a37ea-71ee-4b0b-a0f7-2b711353c755",
+                                    "name": "On the street"
+                                },
+                                {
+                                    "id": "81bad5cf-875a-4654-b1bd-cfa93b6924cb",
+                                    "name": "Elevator"
+                                },
+                                {
+                                    "id": "1c8818f3-3f6f-48e8-9f70-24d729219eeb",
+                                    "name": "Wardrobes"
+                                },
+                                {
+                                    "id": "bf9bb2af-a162-4872-aafa-533d15fcbd03",
+                                    "name": "Air-Conditioner"
+                                }
+                            ]
+                        }
+                    )
+                ]
             )
         }
     )
     def get(self, request):
         property_features = PropertyFeature.objects.all()
-        return CustomResponse.success(message="Successfully retrieved property features", data=list(property_features))
+
+        data = [
+            {
+                "id": property_feature.id,
+                "name": property_feature.name
+            }
+            for property_feature in property_features
+        ]
+        return CustomResponse.success(message="Successfully retrieved property features", data=data)
 
 
 class CreatePropertyAdView(APIView):

@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.contrib.auth import get_user_model
 from django.db import models
 
@@ -13,6 +15,9 @@ User = get_user_model()
 
 class AdCategory(BaseModel):
     name = models.CharField(max_length=255)
+
+    class Meta:
+        verbose_name_plural = 'Ad Categories'
 
     def __str__(self):
         return self.name
@@ -70,12 +75,15 @@ class Property(BaseModel):
 
     objects = PropertyManager()
 
+    class Meta:
+        verbose_name_plural = 'Properties'
+
     def __str__(self):
         return self.name
 
     @property
     def discounted_price(self):
-        return self.price - (self.price * (self.discount / 100)) if self.discount > 0 else 'No discounted price'
+        return self.price - (self.price * Decimal((self.discount / 100))) if self.discount > 0 else 'No discounted price'
 
 
 class PropertyMedia(BaseModel):
