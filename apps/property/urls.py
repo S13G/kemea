@@ -7,7 +7,7 @@ urlpatterns = [
     path('terminate/ad/<str:property_id>', TerminatePropertyAdView.as_view(), name='terminate-property-ad'),
     path('dashboard/search', SearchAgentDashboardView.as_view(), name='search-dashboard'),
     path('property/filter/agent', RetrieveFilteredAdsView.as_view(), name='agent-filtered-ads'),
-    path('property/<str:id>', RetrievePropertyAdDetailsView.as_view(), name='property-ad-details'),
+    path('property/details/<str:id>', RetrievePropertyAdDetailsView.as_view(), name='property-ad-details'),
     path('ads/categories', RetrieveAdCategoriesView.as_view(), name='ad-categories'),
     path('types', RetrievePropertyTypeView.as_view(), name='property-types'),
     path('state', RetrievePropertyStateView.as_view(), name='property-states'),
@@ -18,5 +18,4 @@ urlpatterns = [
     path('agent-profile/details', RetrieveUpdateAgentProfileView.as_view(), name='retrieve-update-delete-agent'),
     path('favorite/properties', RetrieveCreateDeleteFavoritePropertyView.as_view(),
          name='retrieve-create-update-favorite-property'),
-    path('details', RetrievePropertyAdDetailsView.as_view(), name='property-ad-details'),
 ]

@@ -17,7 +17,8 @@ from apps.property.filters import AdFilter
 from apps.property.models import Property, AdCategory, PropertyType, PropertyState, PropertyFeature, PropertyMedia, \
     FavoriteProperty
 from apps.property.selectors import get_dashboard_details, terminate_property_ad, get_searched_property_ads, \
-    get_property_for_user, update_property, get_agent_profile, get_favorite_properties, get_single_property
+    get_property_for_user, update_property, get_agent_profile, get_favorite_properties, get_single_property, \
+    handle_property_creation
 from apps.property.serializers import CreatePropertyAdSerializer, PropertyAdSerializer
 
 
@@ -39,7 +40,23 @@ class RetrieveAgentDashboardView(APIView):
                 examples=[
                     OpenApiExample(
                         name="Success response",
-                        value={}
+                        value={
+                            "status": "success",
+                            "message": "Successfully retrieved agent dashboard",
+                            "data": {
+                                "full_name": "Ayomide Alonge",
+                                "num_of_property_ads": 1,
+                                "all_property_ads": [
+                                    {
+                                        "id": "691f0273-4c27-40ad-a809-3d7d0fb968d1",
+                                        "name": "Property 10",
+                                        "property_type__name": "Apartment",
+                                        "ad_category__name": "Buy",
+                                        "ad_status": "PENDING"
+                                    }
+                                ]
+                            }
+                        }
                     )
                 ]
             )
@@ -48,10 +65,11 @@ class RetrieveAgentDashboardView(APIView):
     def get(self, request):
         full_name = request.user.full_name
         ads_data = get_dashboard_details(user=request.user)
+        num_of_property_ads = len(ads_data) if ads_data else 0
 
         data = {
             "full_name": full_name,
-            "num_of_property_ads": ads_data[0]['num_ads'] if ads_data else 0,
+            "num_of_property_ads": num_of_property_ads,
             "all_property_ads": list(ads_data)
         }
         return CustomResponse.success(message="Successfully retrieved agent dashboard", data=data)
@@ -113,9 +131,50 @@ class SearchAgentDashboardView(APIView):
         This endpoint allows an authenticated agent to search their dashboard that contains their active property ads
         """,
         tags=['Agent Dashboard'],
+        parameters=[
+            OpenApiParameter(name="search", description="Search query", required=False, type=OpenApiTypes.STR),
+        ],
+        responses={
+            status.HTTP_200_OK: OpenApiResponse(
+                response={'application/json'},
+                description="Successfully retrieved search results",
+                examples=[
+                    OpenApiExample(
+                        name="Success response",
+                        value={
+                            "status": "success",
+                            "message": "Successfully retrieved searched results",
+                            "data": [
+                                {
+                                    "id": "8e99122a-6646-4d72-bb94-872ba44bf953",
+                                    "name": "Crazy Boe",
+                                    "property_type__name": "Apartment",
+                                    "ad_category__name": "Buy",
+                                    "ad_status": "PENDING"
+                                },
+                                {
+                                    "id": "dd4f6e39-a852-4687-8c90-2b2917169530",
+                                    "name": "Hanna Montana",
+                                    "property_type__name": "Apartment",
+                                    "ad_category__name": "Buy",
+                                    "ad_status": "PENDING"
+                                },
+                                {
+                                    "id": "691f0273-4c27-40ad-a809-3d7d0fb968d1",
+                                    "name": "Property 10",
+                                    "property_type__name": "Apartment",
+                                    "ad_category__name": "Buy",
+                                    "ad_status": "PENDING"
+                                }
+                            ]
+                        }
+                    )
+                ]
+            )
+        }
     )
     def get(self, request, *args, **kwargs):
-        search = request.query_params.get('q')
+        search = request.query_params.get('search', '')
 
         get_property_ads = get_searched_property_ads(user=request.user, search=search)
 
@@ -387,18 +446,38 @@ class CreatePropertyAdView(APIView):
         summary="Create property ad",
         description="""
         This endpoint allows an authenticated agent to create a new property ad
-        Use this endpoint for both buy and sell
+        Use this endpoint for both buy and sell.
         """,
         tags=['Agent Dashboard'],
+        responses={
+            status.HTTP_201_CREATED: OpenApiResponse(
+                description="Successfully created property ad",
+                response=PropertyAdSerializer
+            ),
+            status.HTTP_409_CONFLICT: OpenApiResponse(
+                description="Property already exists",
+                response={'application/json'},
+                examples=[
+                    OpenApiExample(
+                        name="Conflict response",
+                        value={
+                            "status": "failure",
+                            "message": "Property already exists",
+                            "code": "already_exists"
+                        }
+                    )
+                ]
+            )
+        }
     )
     @transaction.atomic
     def post(self, request):
         serializer = self.serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        # Create property ad
-        property_ad = Property.objects.create(lister=request.user, **serializer.validated_data)
-        serialized_data = PropertyAdSerializer(property_ad).data
+        validated_data = serializer.validated_data
+
+        serialized_data = handle_property_creation(validated_data=validated_data, user=request.user)
         return CustomResponse.success(message="Successfully created property ad", data=serialized_data,
                                       status_code=status.HTTP_201_CREATED)
 
@@ -611,6 +690,26 @@ class RetrievePropertyAdDetailsView(APIView):
             This endpoint allows an authenticated user to retrieve a property ad details
             """,
         tags=['Agent Dashboard'],
+        responses={
+            status.HTTP_200_OK: OpenApiResponse(
+                description="Successfully retrieved property ad",
+                response=PropertyAdSerializer,
+            ),
+            status.HTTP_404_NOT_FOUND: OpenApiResponse(
+                description="Property not found",
+                response={'application/json'},
+                examples=[
+                    OpenApiExample(
+                        name="Error response",
+                        value={
+                            "status": "failure",
+                            "message": "Property not found",
+                            "code": "non_existent"
+                        }
+                    )
+                ]
+            )
+        }
     )
     def get(self, request, *args, **kwargs):
         property_id = kwargs.get('id')

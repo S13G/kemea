@@ -1,6 +1,9 @@
+from django.contrib.auth import get_user_model
 from rest_framework import serializers as sr
 
 from apps.property.models import PropertyType, AdCategory, PropertyState, PropertyFeature, Property
+
+User = get_user_model()
 
 
 class CreatePropertyAdSerializer(sr.Serializer):
@@ -29,16 +32,31 @@ class CreatePropertyAdSerializer(sr.Serializer):
     name_of_lister = sr.CharField()
 
 
-class PropertyAdSerializer(sr.Serializer):
+class PropertyAdSerializer(sr.ModelSerializer):
     media_urls = sr.SerializerMethodField()
+    discounted_price = sr.SerializerMethodField()
+    lister = sr.PrimaryKeyRelatedField(queryset=User.objects.all())
+    lister_name = sr.StringRelatedField(source='lister')
+    property_type = sr.PrimaryKeyRelatedField(queryset=PropertyType.objects.all())
+    property_type_name = sr.StringRelatedField(source='property_type')
+    property_state = sr.PrimaryKeyRelatedField(queryset=PropertyState.objects.all())
+    property_state_name = sr.StringRelatedField(source='property_state')
+    ad_category = sr.PrimaryKeyRelatedField(queryset=AdCategory.objects.all())
+    ad_category_name = sr.StringRelatedField(source='ad_category')
+    features = sr.PrimaryKeyRelatedField(many=True, queryset=PropertyFeature.objects.all())
+    feature_names = sr.StringRelatedField(many=True, source='features')
 
     class Meta:
         model = Property
         exclude = ['created', 'updated']
 
     @staticmethod
+    def get_discounted_price(obj):
+        return obj.discounted_price
+
+    @staticmethod
     def get_media_urls(obj):
         media_urls = []
-        for media in obj.media:
+        for media in obj.property_media.all():
             media_urls.append(media.media.url)
         return media_urls

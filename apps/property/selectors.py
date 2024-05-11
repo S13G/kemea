@@ -1,15 +1,16 @@
-from django.db.models import Count, Q
+from django.db import IntegrityError
+from django.db.models import Q
 from rest_framework import status
 
 from apps.common.errors import ErrorCode
 from apps.common.exceptions import RequestError
 from apps.core.models import AgentProfile
-from apps.property.models import Property, PropertyMedia, FavoriteProperty
+from apps.property.models import Property, PropertyMedia, FavoriteProperty, PropertyFeature
+from apps.property.serializers import PropertyAdSerializer
 
 
 def get_dashboard_details(user):
     return Property.objects.filter(lister=user) \
-        .annotate(num_ads=Count('id')) \
         .values('id', 'name', 'property_type__name', 'ad_category__name', 'ad_status') \
         .order_by('-created')
 
@@ -31,12 +32,13 @@ def terminate_property_ad(user, ad_id):
 
 
 def get_searched_property_ads(user, search):
-    return Property.objects.filter(lister=user).filter(Q(name__icontains=search) | Q(ad_status__icontains=search) |
-                                                       Q(description__icontains=search),
-                                                       Q(property_type__name__icontains=search) |
-                                                       Q(ad_category__name__icontains=search)
-                                                       ).values('id', 'name', 'property_type__name',
-                                                                'ad_category__name', 'ad_status').order_by('-created')
+    return (Property.objects.filter(Q(name__icontains=search) | Q(ad_status__icontains=search) |
+                                    Q(description__icontains=search) |
+                                    Q(property_type__name__icontains=search) |
+                                    Q(ad_category__name__icontains=search),
+                                    lister=user)
+            .values('id', 'name', 'property_type__name',
+                    'ad_category__name', 'ad_status').order_by('-created'))
 
 
 def get_property_for_user(user, property_id):
@@ -92,3 +94,31 @@ def get_single_property(property_id):
     except Property.DoesNotExist:
         raise RequestError(err_code=ErrorCode.NON_EXISTENT, err_msg="Property not found",
                            status_code=status.HTTP_404_NOT_FOUND)
+
+
+def handle_property_creation(validated_data, user):
+    # Pop off features which are many to many
+    features = validated_data.pop('features', [])
+
+    # Handle media files
+    media_data = validated_data.pop('media', [])
+
+    # Create property ad
+    try:
+        property_ad = Property.objects.create(lister=user, **validated_data)
+
+        # Add features if features exists
+        if features:
+            feature_instances = PropertyFeature.objects.filter(name__in=features)
+            property_ad.features.add(*feature_instances)
+
+        # Add media data if media data exists
+        if media_data:
+            media_instances = [PropertyMedia(property=property_ad, media=item) for item in media_data]
+            PropertyMedia.objects.bulk_create(media_instances)
+
+    except IntegrityError:
+        raise RequestError(err_code=ErrorCode.ALREADY_EXISTS, err_msg="Property already exists",
+                           status_code=status.HTTP_409_CONFLICT)
+
+    return PropertyAdSerializer(property_ad).data
