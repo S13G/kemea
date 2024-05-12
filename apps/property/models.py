@@ -50,7 +50,7 @@ class Property(BaseModel):
     property_state = models.ForeignKey(PropertyState, on_delete=models.CASCADE, null=True,
                                        related_name="property_state")
     ad_category = models.ForeignKey(AdCategory, on_delete=models.CASCADE, null=True, related_name="ad_category")
-    name = models.CharField(max_length=255, unique=True)
+    name = models.CharField(max_length=255)
     city = models.CharField(max_length=255)
     floors = models.PositiveIntegerField(default=20)
     ground_level = models.BooleanField(default=False)
@@ -69,7 +69,7 @@ class Property(BaseModel):
     description = models.TextField()
     matterport_view_link = models.CharField(max_length=255, null=True)
     name_of_lister = models.CharField(max_length=255, null=True)
-    reachable_phone_number = models.CharField(max_length=255, null=True, validators=[validate_phone_number])
+    reachable_phone_number = models.CharField(max_length=255, null=True, validators=[validate_phone_number], default='')
     ad_status = models.CharField(max_length=100, choices=AD_STATUS, default=PENDING)
     terminated = models.BooleanField(default=False)
 

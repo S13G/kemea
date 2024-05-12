@@ -1,6 +1,4 @@
 from django.db import transaction
-from django.db.models import OuterRef, Subquery
-from django.db.models.functions import Coalesce
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiResponse, OpenApiTypes, OpenApiExample
 from rest_framework import status
@@ -13,13 +11,12 @@ from apps.common.permissions import IsAuthenticatedAgent
 from apps.common.responses import CustomResponse
 from apps.core.serializers import AgentProfileSerializer
 from apps.property.choices import APPROVED
-from apps.property.filters import AdFilter
-from apps.property.models import Property, AdCategory, PropertyType, PropertyState, PropertyFeature, PropertyMedia, \
-    FavoriteProperty
+from apps.property.filters import AdFilter, PropertyAdFilter
+from apps.property.models import Property, AdCategory, PropertyType, PropertyState, PropertyFeature, FavoriteProperty
 from apps.property.selectors import get_dashboard_details, terminate_property_ad, get_searched_property_ads, \
-    get_property_for_user, update_property, get_agent_profile, get_favorite_properties, get_single_property, \
-    handle_property_creation
-from apps.property.serializers import CreatePropertyAdSerializer, PropertyAdSerializer
+    get_property_for_user, get_agent_profile, get_favorite_properties, get_single_property, \
+    handle_property_creation, update_property
+from apps.property.serializers import CreatePropertyAdSerializer, PropertyAdSerializer, FavoritePropertySerializer
 
 
 # Create your views here.
@@ -493,6 +490,12 @@ class RetrieveUpdateDeletePropertyAdView(APIView):
             Use this endpoint for both buy and sell
             """,
         tags=['Agent Dashboard'],
+        responses={
+            status.HTTP_200_OK: OpenApiResponse(
+                response=PropertyAdSerializer,
+                description="Successfully retrieved property ad"
+            ),
+        }
     )
     def get(self, request, *args, **kwargs):
         property_id = kwargs.get('id')
@@ -507,21 +510,41 @@ class RetrieveUpdateDeletePropertyAdView(APIView):
         Use this endpoint for both buy and sell
         """,
         tags=['Agent Dashboard'],
+        responses={
+            status.HTTP_202_ACCEPTED: OpenApiResponse(
+                response=PropertyAdSerializer,
+                description="Successfully updated property ad"
+            ),
+            status.HTTP_400_BAD_REQUEST: OpenApiResponse(
+                response={'application/json'},
+                description="An error occurred while updating the property ad",
+                examples=[
+                    OpenApiExample(
+                        name="Other error",
+                        value={
+                            "status": "failure",
+                            "message": "An error occurred while updating the property ad",
+                            "code": "other_error"
+                        }
+                    )
+                ]
+            )
+        }
     )
     @transaction.atomic
     def patch(self, request, *args, **kwargs):
         property_id = kwargs.get('id')
         property_ad = get_property_for_user(request.user, property_id=property_id)
 
+        if not property_ad:
+            raise RequestError(status_code=status.HTTP_404_NOT_FOUND, err_msg="Property not found")
+
         serializer = self.serializer_class(data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
 
         data = serializer.validated_data
 
-        # Update specific media
-        media_data = data.pop('media', [])
-
-        update_property(serialized_data=data, property_ad=property_ad, media_data=media_data)
+        update_property(serialized_data=data, property_ad=property_ad)
 
         serialized_data = PropertyAdSerializer(property_ad).data
         return CustomResponse.success(message="Successfully updated property ad", data=serialized_data,
@@ -530,9 +553,24 @@ class RetrieveUpdateDeletePropertyAdView(APIView):
     @extend_schema(
         summary="Delete property ad",
         description="""
-        This endpoint allows an authenticated agent to delete a property ad
-        """,
+            This endpoint allows an authenticated agent to delete a property ad
+            """,
         tags=['Agent Dashboard'],
+        responses={
+            status.HTTP_204_NO_CONTENT: OpenApiResponse(
+                description="Successfully deleted property ad",
+                response={'application/json'},
+                examples=[
+                    OpenApiExample(
+                        name="Success response",
+                        value={
+                            "status": "success",
+                            "message": "Successfully deleted property ad"
+                        }
+                    )
+                ]
+            )
+        }
     )
     @transaction.atomic
     def delete(self, request, *args, **kwargs):
@@ -547,7 +585,7 @@ class RetrieveUpdateAgentProfileView(APIView):
     permission_classes = [IsAuthenticatedAgent]
     serializer_class = AgentProfileSerializer
     filter_backends = [DjangoFilterBackend]
-    filterset_class = AdFilter
+    filterset_class = PropertyAdFilter
 
     @extend_schema(
         summary="Retrieve agent profile",
@@ -557,7 +595,7 @@ class RetrieveUpdateAgentProfileView(APIView):
         tags=['Agent Profile'],
         parameters=[
             OpenApiParameter(name='property_type', description="Type of property", required=False,
-                             type=OpenApiTypes.STR),
+                             type=OpenApiTypes.STR, enum=PropertyType.objects.values_list('name', flat=True)),
             OpenApiParameter(name='price_min', description="Minimum price", required=False, type=OpenApiTypes.FLOAT),
             OpenApiParameter(name='price_max', description="Maximum price", required=False, type=OpenApiTypes.FLOAT),
             OpenApiParameter(name='surface_build_min', description="Minimum surface price", required=False,
@@ -566,37 +604,113 @@ class RetrieveUpdateAgentProfileView(APIView):
                              type=OpenApiTypes.FLOAT),
             OpenApiParameter(name='rooms', description="Number of rooms", required=False, type=OpenApiTypes.INT),
             OpenApiParameter(name='floors', description="Number of floors", required=False, type=OpenApiTypes.INT),
-            OpenApiParameter(name='features', description="Features", required=False, type=OpenApiTypes.STR),
-        ]
+            OpenApiParameter(name='features', description="Features", required=False, type=OpenApiTypes.STR,
+                             enum=PropertyFeature.objects.values_list('name', flat=True), many=True),
+            OpenApiParameter(name='last_week', description="Filter by properties posted in the last week",
+                             required=False, type=OpenApiTypes.BOOL),
+            OpenApiParameter(name='last_month', description="Filter by properties posted in the last month",
+                             required=False, type=OpenApiTypes.BOOL),
+            OpenApiParameter(name='last_24_hours', description="Filter by properties posted in the last 24 hours",
+                             required=False, type=OpenApiTypes.BOOL),
+        ],
+        responses={
+            status.HTTP_200_OK: OpenApiResponse(
+                description="Successfully retrieved agent profile",
+                response={"application/json"},
+                examples=[
+                    OpenApiExample(
+                        name="Success response",
+                        value={
+                            "status": "success",
+                            "message": "Successfully retrieved agent profile",
+                            "data": {
+                                "agent_info": {
+                                    "user_id": "59af4ef1-8e58-47cf-9f1a-e7bae786b883",
+                                    "id": "542ee57a-7a5e-4332-a9a7-4de9a775e570",
+                                    "full_name": "John Doe",
+                                    "company_name": "John Realtor",
+                                    "email": "admin@gmail.com",
+                                    "image": "/media/static/profile_images/Screenshot_from_2024-05-12_17-43-24_GbVly18.png",
+                                    "background_image": "/media/static/profile_bg_images/Screenshot_from_2024-05-12_17-43-48_SUuDb6j.png",
+                                    "phone_number": "0803764632",
+                                    "license_number": "JHFD77WJK",
+                                    "location": "Rub",
+                                    "website": "https://google.com"
+                                },
+                                "total_number_of_ads": 1,
+                                "ads": [
+                                    {
+                                        "property": {
+                                            "id": "8e99122a-6646-4d72-bb94-872ba44bf953",
+                                            "media_urls": [
+                                                "/media/property_media/7179060_1F5N9rZ.jpg",
+                                                "/media/property_media/7179095_Lxd9Y9v.jpg",
+                                                "/media/property_media/7179104_oWThtIz.jpg"
+                                            ],
+                                            "discounted_price": 926250,
+                                            "lister": "59af4ef1-8e58-47cf-9f1a-e7bae786b883",
+                                            "lister_name": "admin@gmail.com",
+                                            "property_type": "6aec02ba-8c5c-445d-bca4-6d3a555095b5",
+                                            "property_type_name": "Apartment",
+                                            "property_state": "c3b37a05-3978-452d-b118-35ec6e754613",
+                                            "property_state_name": "Renovated",
+                                            "ad_category": "057dc877-064b-449a-a178-35d02cf80aa1",
+                                            "ad_category_name": "Buy",
+                                            "features": [
+                                                "dab34afa-5a47-4834-8838-3e443d0818ed"
+                                            ],
+                                            "feature_names": [
+                                                "Pool"
+                                            ],
+                                            "name": "Crazy Boe",
+                                            "city": "ibadan",
+                                            "floors": 10,
+                                            "ground_level": True,
+                                            "street": "lautech street",
+                                            "street_number": 9,
+                                            "area": "lautech area",
+                                            "number_of_rooms": 10,
+                                            "surface_build": 800,
+                                            "total_surface": 9000,
+                                            "price": 975000,
+                                            "discount": 5,
+                                            "entry_date": "2023-09-12",
+                                            "number_of_balcony": 1,
+                                            "car_parking": 5,
+                                            "description": "this is a new thing",
+                                            "matterport_view_link": "https://dertuyio.com,",
+                                            "name_of_lister": "Montan Doe",
+                                            "reachable_phone_number": "+234902245678",
+                                            "ad_status": "APPROVED",
+                                            "terminated": False
+                                        },
+                                        "first_media_url": "/media/property_media/7179060_1F5N9rZ.jpg"
+                                    }
+                                ]
+                            }
+                        }
+                    )
+                ]
+            )
+        }
     )
     def get(self, request):
         user = request.user
         agent_profile = get_agent_profile(user=user)
         serialized_data = self.serializer_class(agent_profile).data
-        queryset = Property.objects.filter(lister=user, ad_status=APPROVED)
+        queryset = Property.objects.filter(lister=user, ad_status=APPROVED, terminated=False)
         filtered_queryset = self.filterset_class(request.GET, queryset=queryset).qs.order_by('-created')
         total_number_of_ads = filtered_queryset.count()
 
-        # Annotate the queryset with the URL of the first media file for each property
-        annotated_queryset = filtered_queryset.annotate(
-            first_media_url=Coalesce(
-                Subquery(
-                    PropertyMedia.objects.filter(property__id=OuterRef('id')).order_by('id').values('media')[:1]
-                ),
-                ''
-            )
-        )
-
-        # Serialize the annotated queryset
         data = {
             "agent_info": serialized_data,
             "total_number_of_ads": total_number_of_ads,
             "ads": [
                 {
                     "property": PropertyAdSerializer(each_property).data,
-                    "first_media_url": each_property.first_media_url  # URL of the first media file
+                    "first_media_url": each_property.property_media.first().media.url  # URL of the first media file
                 }
-                for each_property in annotated_queryset
+                for each_property in filtered_queryset
             ]
         }
         return CustomResponse.success(message="Successfully retrieved agent profile", data=data)
@@ -607,6 +721,34 @@ class RetrieveUpdateAgentProfileView(APIView):
         This endpoint allows an authenticated agent to update their profile
         """,
         tags=['Agent Profile'],
+        responses={
+            status.HTTP_202_ACCEPTED: OpenApiResponse(
+                description="Successfully updated agent profile",
+                response={'application/json'},
+                examples=[
+                    OpenApiExample(
+                        name="Success response",
+                        value={
+                            "status": "success",
+                            "message": "Successfully updated agent profile",
+                            "data": {
+                                "user_id": "59af4ef1-8e58-47cf-9f1a-e7bae786b883",
+                                "id": "542ee57a-7a5e-4332-a9a7-4de9a775e570",
+                                "full_name": "John Fow",
+                                "company_name": "John Realtor",
+                                "email": "ayflix0@gmail.com",
+                                "image": "/media/static/profile_images/Screenshot_from_2024-05-12_17-43-24_GbVly18.png",
+                                "background_image": "/media/static/profile_bg_images/Screenshot_from_2024-05-12_17-43-48_SUuDb6j.png",
+                                "phone_number": "0803764632",
+                                "license_number": "JHFD77WJK",
+                                "location": "Rub",
+                                "website": "https://google.com"
+                            }
+                        }
+                    )
+                ]
+            )
+        }
     )
     @transaction.atomic
     def patch(self, request):
@@ -625,22 +767,32 @@ REGISTERED USERS
 """
 
 
-class RetrieveCreateDeleteFavoritePropertyView(APIView):
+class RetrieveAllFavoritesPropertyView(APIView):
     permission_classes = [IsAuthenticated]
-    serializer_class = PropertyAdSerializer
+    serializer_class = FavoritePropertySerializer
 
     @extend_schema(
         summary="Retrieve all favorite properties",
         description="""
-        This endpoint allows an authenticated agent to retrieve all their favorite properties
+        This endpoint allows an authenticated user to retrieve all their favorite properties
         """,
         tags=['Favorites'],
+        responses={
+            status.HTTP_200_OK: OpenApiResponse(
+                description="Successfully retrieved favorite properties",
+                response=PropertyAdSerializer(many=True)
+            )
+        }
     )
     def get(self, request):
         user = request.user
         property_ads = get_favorite_properties(user=user)
-        serialized_data = PropertyAdSerializer(property_ads, many=True).data
+        serialized_data = self.serializer_class(property_ads, many=True).data
         return CustomResponse.success(message="Successfully retrieved favorite properties", data=serialized_data)
+
+
+class CreateDeleteFavoritePropertyView(APIView):
+    permission_classes = [IsAuthenticated]
 
     @extend_schema(
         summary="Add property to favorite properties",
@@ -648,6 +800,35 @@ class RetrieveCreateDeleteFavoritePropertyView(APIView):
         This endpoint allows an authenticated user to add a property to their favorite properties
         """,
         tags=['Favorites'],
+        responses={
+            status.HTTP_201_CREATED: OpenApiResponse(
+                description="Successfully added property to favorites",
+                response={'application/json'},
+                examples=[
+                    OpenApiExample(
+                        name="Success response",
+                        value={
+                            "status": "success",
+                            "message": "Successfully added property to favorites"
+                        }
+                    )
+                ]
+            ),
+            status.HTTP_404_NOT_FOUND: OpenApiResponse(
+                description="Property not found",
+                response={'application/json'},
+                examples=[
+                    OpenApiExample(
+                        name="Error response",
+                        value={
+                            "status": "failure",
+                            "message": "Property not found",
+                            "code": "non_existent"
+                        }
+                    )
+                ]
+            )
+        }
     )
     @transaction.atomic
     def post(self, request, *args, **kwargs):
@@ -657,7 +838,7 @@ class RetrieveCreateDeleteFavoritePropertyView(APIView):
 
         # Create property object
         FavoriteProperty.objects.create(property=property_ad, user=user)
-        return CustomResponse.success(message="Successfully added property to favorite properties")
+        return CustomResponse.success(message="Successfully added property to favorites")
 
     @extend_schema(
         summary="Delete property from favorite properties",
@@ -665,6 +846,43 @@ class RetrieveCreateDeleteFavoritePropertyView(APIView):
         This endpoint allows an authenticated user to delete a property from their favorite properties
         """,
         tags=['Favorites'],
+        responses={
+            status.HTTP_204_NO_CONTENT: OpenApiResponse(
+                description="Successfully deleted property to favorites",
+                response={'application/json'},
+                examples=[
+                    OpenApiExample(
+                        name="Success response",
+                        value={
+                            "status": "success",
+                            "message": "Successfully deleted property to favorites"
+                        }
+                    )
+                ]
+            ),
+            status.HTTP_404_NOT_FOUND: OpenApiResponse(
+                description="Property not found",
+                response={'application/json'},
+                examples=[
+                    OpenApiExample(
+                        name="Error response",
+                        value={
+                            "status": "failure",
+                            "message": "Property not found",
+                            "code": "non_existent"
+                        }
+                    ),
+                    OpenApiExample(
+                        name="Error response",
+                        value={
+                            "status": "failure",
+                            "message": "Property not found in favorites list",
+                            "code": "non_existent"
+                        }
+                    ),
+                ]
+            )
+        }
     )
     def delete(self, request, *args, **kwargs):
         user = request.user
@@ -674,10 +892,11 @@ class RetrieveCreateDeleteFavoritePropertyView(APIView):
         try:
             FavoriteProperty.objects.get(property=property_ad, user=user).delete()
         except FavoriteProperty.DoesNotExist:
-            raise RequestError(err_code=ErrorCode.NON_EXISTENT, err_msg="Property not found",
+            raise RequestError(err_code=ErrorCode.NON_EXISTENT, err_msg="Property not found in favorites list",
                                status_code=status.HTTP_404_NOT_FOUND)
 
-        return CustomResponse.success(message="Successfully deleted property from favorite properties")
+        return CustomResponse.success(message="Successfully deleted property from favorites",
+                                      status_code=status.HTTP_204_NO_CONTENT)
 
 
 class RetrievePropertyAdDetailsView(APIView):

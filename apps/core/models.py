@@ -28,7 +28,7 @@ class User(AbstractBaseUser, BaseModel, PermissionsMixin):
     objects = CustomUserManager()
 
     def __str__(self):
-        return f"{self.email} -- {self.full_name}"
+        return self.email
 
     # Generate JWT tokens for the user(using this specifically for oauth)
     def tokens(self):
@@ -60,7 +60,7 @@ class AgentProfile(BaseModel):
     website = models.CharField(max_length=255, null=True)
 
     def __str__(self):
-        return f"{self.user.full_name} -- {self.user.full_name}"
+        return self.company_name
 
     @property
     def profile_image_url(self):
@@ -77,7 +77,7 @@ class NormalProfile(BaseModel):
     date_of_birth = models.DateField(null=True)
 
     def __str__(self):
-        return f"{self.user.full_name} -- {self.user.full_name}"
+        return self.user.full_name
 
     @property
     def profile_image_url(self):

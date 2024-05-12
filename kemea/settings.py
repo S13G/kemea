@@ -67,7 +67,7 @@ REST_FRAMEWORK = {
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
     "COERCE_DECIMAL_TO_STRING": False,
-    "EXCEPTION_HANDLER": "apps.common.exceptions.custom_exception_handler",
+    # "EXCEPTION_HANDLER": "apps.common.exceptions.custom_exception_handler",
     "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.AllowAny",),
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_THROTTLE_CLASSES": [
@@ -76,6 +76,7 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_THROTTLE_RATES": {"anon": "5000/day", "user": "10000/day"},
     "NON_FIELD_ERRORS_KEY": "error",
+    "COMPONENT_SPLIT_REQUEST": True
 }
 
 CORS_ALLOW_HEADERS = (

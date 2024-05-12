@@ -1,6 +1,7 @@
 from django.contrib.auth import get_user_model
 from rest_framework import serializers as sr
 
+from apps.core.validators import validate_phone_number
 from apps.property.models import PropertyType, AdCategory, PropertyState, PropertyFeature, Property
 
 User = get_user_model()
@@ -30,6 +31,7 @@ class CreatePropertyAdSerializer(sr.Serializer):
     matterport_view_link = sr.CharField()
     media = sr.ListField(child=sr.FileField(), allow_empty=True, max_length=30)
     name_of_lister = sr.CharField()
+    reachable_phone_number = sr.CharField(validators=[validate_phone_number])
 
 
 class PropertyAdSerializer(sr.ModelSerializer):
@@ -58,5 +60,31 @@ class PropertyAdSerializer(sr.ModelSerializer):
     def get_media_urls(obj):
         media_urls = []
         for media in obj.property_media.all():
+            media_urls.append(media.media.url)
+        return media_urls
+
+
+class FavoritePropertySerializer(sr.Serializer):
+    media_urls = sr.SerializerMethodField()
+    discounted_price = sr.SerializerMethodField()
+    lister = sr.CharField(source='property.lister')
+    lister_name = sr.CharField(source='property.lister.full_name')
+    property_type = sr.PrimaryKeyRelatedField(queryset=PropertyType.objects.all())
+    property_type_name = sr.StringRelatedField(source='property_type')
+    property_state = sr.PrimaryKeyRelatedField(queryset=PropertyState.objects.all())
+    property_state_name = sr.StringRelatedField(source='property_state')
+    ad_category = sr.PrimaryKeyRelatedField(queryset=AdCategory.objects.all())
+    ad_category_name = sr.StringRelatedField(source='ad_category')
+    features = sr.PrimaryKeyRelatedField(many=True, queryset=PropertyFeature.objects.all())
+    feature_names = sr.StringRelatedField(many=True, source='features')
+
+    @staticmethod
+    def get_discounted_price(obj):
+        return obj.property.discounted_price
+
+    @staticmethod
+    def get_media_urls(obj):
+        media_urls = []
+        for media in obj.property.property_media.all():
             media_urls.append(media.media.url)
         return media_urls

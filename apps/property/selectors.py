@@ -57,23 +57,59 @@ def get_property_media(item_id, property_ad):
                            status_code=status.HTTP_404_NOT_FOUND)
 
 
-def update_property(serialized_data, property_ad, media_data):
-    # Update Property fields
-    for key, value in serialized_data.items():
-        setattr(property_ad, key, value)
-    property_ad.save()
+def update_property(serialized_data, property_ad):
+    try:
+        # Update specific fields from validated data (excluding features and media)
+        for key, value in serialized_data.items():
+            if key not in ('features', 'media'):
+                setattr(property_ad, key, value)
 
-    # Update media data (files)
+        # Update features (ManyToMany)
+        features = serialized_data.get('features')
+        if features:
+            update_features(property_ad, features)
+
+        # Update media data (files)
+        media = serialized_data.get('media')
+        if media:
+            update_media(property_ad, media_data=media)
+
+        property_ad.save()
+
+    except Exception as e:
+        raise RequestError(err_code=ErrorCode.OTHER_ERROR, status_code=status.HTTP_400_BAD_REQUEST,
+                           err_msg=f"An error occurred while updating the property ad: {e}")
+
+
+def update_features(property_ad, features):
+    existing_features = list(property_ad.features.all())  # Get existing features
+
+    # Identify features to add or remove (set difference)
+    features_to_add = set(features) - set(existing_features)
+    features_to_remove = set(existing_features) - set(features)
+
+    # Add new features
+    if features_to_add:
+        feature_instances = PropertyFeature.objects.filter(name__in=features_to_add)
+        property_ad.features.add(*feature_instances)
+
+    # Remove unwanted features
+    property_ad.features.remove(*features_to_remove)
+
+
+def update_media(property_ad, media_data):
+    existing_images = PropertyMedia.objects.filter(property=property_ad)
+
+    # Delete existing images only if new images are provided
     if media_data:
-        for media_item in media_data:
-            item_id = media_item.get('id')
-            item_file = media_item.get('media')
+        existing_images.delete()
 
-            if item_id and item_file:
-                # Update the image with the corresponding ID
-                media_obj = get_property_media(item_id=item_id, property_ad=property_ad)
-                media_obj.media = item_file
-                media_obj.save()
+        # Create new PropertyImage objects for each uploaded image
+        property_images = [
+            PropertyMedia(property=property_ad, media=image_data)
+            for image_data in media_data
+        ]
+        PropertyMedia.objects.bulk_create(property_images)
 
 
 def get_agent_profile(user):
@@ -85,7 +121,7 @@ def get_agent_profile(user):
 
 
 def get_favorite_properties(user):
-    return FavoriteProperty.objects.filter(lister=user)
+    return FavoriteProperty.objects.filter(user=user)
 
 
 def get_single_property(property_id):
