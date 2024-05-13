@@ -8,7 +8,7 @@ CLOUDINARY_STORAGE = {
     "API_SECRET": config("CLOUDINARY_API_SECRET"),
 }
 
-DEBUG = False
+DEBUG = True
 
 ALLOWED_HOSTS = ['kemea.up.railway.app']
 
