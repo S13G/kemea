@@ -26,7 +26,7 @@ urlpatterns = [
          name="change-forgotten-password"),
     path('change/new-password', views.ChangePasswordView.as_view(), name="change-password"),
     path('user-account/create', views.NormalRegistrationView.as_view(), name="normal-user-registration"),
-    path('agent-account/create', views.AgentRegistrationView.as_view(), name="agent-user-registration"),
+    path('company-account/create', views.CompanyRegistrationView.as_view(), name="agent-user-registration"),
     path('user-profile/details', views.RetrieveUpdateProfileView.as_view(),
          name="get-update-delete-profile"),
 ]

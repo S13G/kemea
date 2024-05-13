@@ -31,7 +31,7 @@ class NormalRegisterSerializer(sr.Serializer):
     password = sr.CharField(write_only=True)
 
 
-class AgentRegisterSerializer(sr.Serializer):
+class CompanyRegisterSerializer(sr.Serializer):
     company_name = sr.CharField()
     full_name = sr.CharField()
     licence_number = sr.CharField()
@@ -95,7 +95,7 @@ class NormalProfileSerializer(sr.Serializer):
         return instance
 
 
-class AgentProfileSerializer(sr.Serializer):
+class CompanyProfileSerializer(sr.Serializer):
     user = sr.HiddenField(default=sr.CurrentUserDefault())
     user_id = sr.UUIDField(read_only=True)
     id = sr.UUIDField(read_only=True)

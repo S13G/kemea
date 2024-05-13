@@ -81,6 +81,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='agentprofile',
             name='user',
-            field=models.OneToOneField(null=True, on_delete=django.db.models.deletion.CASCADE, related_name='agent_profile', to=settings.AUTH_USER_MODEL),
+            field=models.OneToOneField(null=True, on_delete=django.db.models.deletion.CASCADE, related_name='company_profile', to=settings.AUTH_USER_MODEL),
         ),
     ]

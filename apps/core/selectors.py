@@ -8,7 +8,7 @@ from apps.common.errors import ErrorCode
 from apps.common.exceptions import RequestError
 from apps.common.responses import CustomResponse
 from apps.core.models import OTPSecret
-from apps.core.serializers import AgentProfileSerializer, NormalProfileSerializer
+from apps.core.serializers import CompanyProfileSerializer, NormalProfileSerializer
 
 User = get_user_model()
 
@@ -29,7 +29,7 @@ def check_email_verification(user):
 
 def get_user_profile(user, is_agent):
     if is_agent:
-        return AgentProfileSerializer(user.agent_profile)
+        return CompanyProfileSerializer(user.company_profile)
     else:
         # Assuming you have a different serializer for non-agent users
         return NormalProfileSerializer(user.profile)
@@ -49,7 +49,7 @@ def get_existing_user(email):
 
     # User exists; handle different scenarios based on user profile
     if user.is_agent:
-        error_msg = "Account already exists and has an agent profile"
+        error_msg = "Account already exists and has an company profile"
     else:
         error_msg = "Account already exists and has a normal profile"
 

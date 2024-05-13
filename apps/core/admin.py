@@ -126,8 +126,8 @@ class NormalProfileAdmin(admin.ModelAdmin):
         return obj.user.phone_number
 
 
-@admin.register(AgentProfile)
-class AgentProfileAdmin(admin.ModelAdmin):
+@admin.register(CompanyProfile)
+class CompanyProfileAdmin(admin.ModelAdmin):
     fieldsets = [
         (
             'Profile Information', {

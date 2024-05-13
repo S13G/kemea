@@ -67,7 +67,7 @@ REST_FRAMEWORK = {
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
     "COERCE_DECIMAL_TO_STRING": False,
-    # "EXCEPTION_HANDLER": "apps.common.exceptions.custom_exception_handler",
+    "EXCEPTION_HANDLER": "apps.common.exceptions.custom_exception_handler",
     "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.AllowAny",),
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_THROTTLE_CLASSES": [
@@ -275,7 +275,13 @@ JAZZMIN_SETTINGS = {
     "icons": {
         "core.group": "fas fa-users",
         "core.user": "fas fa-universal-access",
-        "core.profile": "fas fa-user",
+        "core.companyprofile": "fas fa-building",
+        "core.normalprofile": "fas fa-user",
+        "property.property": "fas fa-home",
+        "property.adcategory": "fas fa-ad",
+        "property.propertyfeature": "fas fa-wrench",
+        "property.propertystate": "fas fa-coins",
+        "property.propertytype": "fas fa-tag",
     },
     # Icons that are used when one is not manually specified
     "default_icon_parents": "fas fa-chevron-circle-right",

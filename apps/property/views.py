@@ -1,4 +1,4 @@
-from django.db import transaction
+from django.db import transaction, IntegrityError
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiResponse, OpenApiTypes, OpenApiExample
 from rest_framework import status
@@ -9,19 +9,25 @@ from apps.common.errors import ErrorCode
 from apps.common.exceptions import RequestError
 from apps.common.permissions import IsAuthenticatedAgent
 from apps.common.responses import CustomResponse
-from apps.core.serializers import AgentProfileSerializer
+from apps.core.serializers import CompanyProfileSerializer
 from apps.property.choices import APPROVED
 from apps.property.filters import AdFilter, PropertyAdFilter
 from apps.property.models import Property, AdCategory, PropertyType, PropertyState, PropertyFeature, FavoriteProperty
 from apps.property.selectors import get_dashboard_details, terminate_property_ad, get_searched_property_ads, \
-    get_property_for_user, get_agent_profile, get_favorite_properties, get_single_property, \
-    handle_property_creation, update_property
-from apps.property.serializers import CreatePropertyAdSerializer, PropertyAdSerializer, FavoritePropertySerializer
-
+    get_property_for_user, get_company_profile, get_favorite_properties, get_single_property, \
+    handle_property_creation, update_property, create_company_agent, get_company_agent
+from apps.property.serializers import CreatePropertyAdSerializer, PropertyAdSerializer, FavoritePropertySerializer, \
+    RegisterCompanyAgentSerializer
 
 # Create your views here.
 
-class RetrieveAgentDashboardView(APIView):
+
+"""
+AGENT DASHBOARD
+"""
+
+
+class RetrieveCompanyDashboardView(APIView):
     permission_classes = [IsAuthenticatedAgent]
 
     @extend_schema(
@@ -581,18 +587,18 @@ class RetrieveUpdateDeletePropertyAdView(APIView):
                                       status_code=status.HTTP_204_NO_CONTENT)
 
 
-class RetrieveUpdateAgentProfileView(APIView):
+class RetrieveUpdateCompanyProfileView(APIView):
     permission_classes = [IsAuthenticatedAgent]
-    serializer_class = AgentProfileSerializer
+    serializer_class = CompanyProfileSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_class = PropertyAdFilter
 
     @extend_schema(
-        summary="Retrieve agent profile",
+        summary="Retrieve company profile",
         description="""
         This endpoint allows an authenticated agent to retrieve their profile alongside their listed accepted properties
         """,
-        tags=['Agent Profile'],
+        tags=['Company Profile'],
         parameters=[
             OpenApiParameter(name='property_type', description="Type of property", required=False,
                              type=OpenApiTypes.STR, enum=PropertyType.objects.values_list('name', flat=True)),
@@ -615,14 +621,14 @@ class RetrieveUpdateAgentProfileView(APIView):
         ],
         responses={
             status.HTTP_200_OK: OpenApiResponse(
-                description="Successfully retrieved agent profile",
+                description="Successfully retrieved company profile",
                 response={"application/json"},
                 examples=[
                     OpenApiExample(
                         name="Success response",
                         value={
                             "status": "success",
-                            "message": "Successfully retrieved agent profile",
+                            "message": "Successfully retrieved company profile",
                             "data": {
                                 "agent_info": {
                                     "user_id": "59af4ef1-8e58-47cf-9f1a-e7bae786b883",
@@ -696,8 +702,8 @@ class RetrieveUpdateAgentProfileView(APIView):
     )
     def get(self, request):
         user = request.user
-        agent_profile = get_agent_profile(user=user)
-        serialized_data = self.serializer_class(agent_profile).data
+        company_profile = get_company_profile(user=user)
+        serialized_data = self.serializer_class(company_profile).data
         queryset = Property.objects.filter(lister=user, ad_status=APPROVED, terminated=False)
         filtered_queryset = self.filterset_class(request.GET, queryset=queryset).qs.order_by('-created')
         total_number_of_ads = filtered_queryset.count()
@@ -713,24 +719,24 @@ class RetrieveUpdateAgentProfileView(APIView):
                 for each_property in filtered_queryset
             ]
         }
-        return CustomResponse.success(message="Successfully retrieved agent profile", data=data)
+        return CustomResponse.success(message="Successfully retrieved company profile", data=data)
 
     @extend_schema(
-        summary="Update agent profile",
+        summary="Update company profile",
         description="""
         This endpoint allows an authenticated agent to update their profile
         """,
-        tags=['Agent Profile'],
+        tags=['Company Profile'],
         responses={
             status.HTTP_202_ACCEPTED: OpenApiResponse(
-                description="Successfully updated agent profile",
+                description="Successfully updated company profile",
                 response={'application/json'},
                 examples=[
                     OpenApiExample(
                         name="Success response",
                         value={
                             "status": "success",
-                            "message": "Successfully updated agent profile",
+                            "message": "Successfully updated company profile",
                             "data": {
                                 "user_id": "59af4ef1-8e58-47cf-9f1a-e7bae786b883",
                                 "id": "542ee57a-7a5e-4332-a9a7-4de9a775e570",
@@ -753,12 +759,159 @@ class RetrieveUpdateAgentProfileView(APIView):
     @transaction.atomic
     def patch(self, request):
         user = request.user
-        agent_profile = get_agent_profile(user=user)
-        serializer = self.serializer_class(agent_profile, data=request.data, partial=True)
+        company_profile = get_company_profile(user=user)
+        serializer = self.serializer_class(company_profile, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
 
         serialized_data = self.serializer_class(serializer.save()).data
-        return CustomResponse.success(message="Successfully updated agent profile", data=serialized_data,
+        return CustomResponse.success(message="Successfully updated company profile", data=serialized_data,
+                                      status_code=status.HTTP_202_ACCEPTED)
+
+
+class RegisterCompanyAgentView(APIView):
+    permission_classes = [IsAuthenticatedAgent]
+    serializer_class = RegisterCompanyAgentSerializer
+
+    @extend_schema(
+        summary="Register company agents",
+        description="""
+        This endpoints allows a company to register all agents that are working for them
+        """,
+        tags=['Company Profile'],
+        responses={
+            status.HTTP_201_CREATED: OpenApiResponse(
+                description="Successfully registered company agent",
+                response={'application/json'},
+                examples=[
+                    OpenApiExample(
+                        name="Success response",
+                        value={
+                            "status": "success",
+                            "message": "Successfully registered company agent",
+                            "data": {
+                                "company_id": "542ee57a-7a5e-4332-a9a7-4de9a775e570",
+                                "company_name": "Doe Realtor",
+                                "full_name": "Baba",
+                                "phone_number": "+23495847453",
+                                "image": "/media/static/profile_images/company_agents/Screenshot_from_2024-05-12_17-43-24.png"
+                            }
+                        }
+                    )
+                ]
+            )
+        }
+    )
+    @transaction.atomic
+    def post(self, request):
+        user = request.user
+        company_profile = get_company_profile(user=user)
+        serializer = self.serializer_class(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        serialized_data = create_company_agent(company_profile=company_profile,
+                                               validated_data=serializer.validated_data)
+        return CustomResponse.success(message="Successfully registered company agent", data=serialized_data,
+                                      status_code=status.HTTP_201_CREATED)
+
+
+class RetrieveAllCompanyAgentView(APIView):
+    permission_classes = [IsAuthenticatedAgent]
+
+    @extend_schema(
+        summary="Retrieve all company agents",
+        description="""
+        This endpoint allows an authenticated company to retrieve all their company agents
+        """,
+        tags=['Company Profile'],
+        responses={
+            status.HTTP_200_OK: OpenApiResponse(
+                description="Successfully retrieved company agents",
+                response={'application/json'},
+                examples=[
+                    OpenApiExample(
+                        name="Success response",
+                        value={
+                            "status": "success",
+                            "message": "Successfully retrieved company agents",
+                            "data": [
+                                {
+                                    "id": "47442d0c-779d-4a86-afd9-0434789f9cad",
+                                    "full_name": "Baba Doe",
+                                    "phone_number": "+2349584745323",
+                                    "profile_picture": "/media/static/profile_images/company_agents/Screenshot_from_2024-05-12_17-43-24_hDaIgcA.png"
+                                },
+                                {
+                                    "id": "4a961d6b-6c57-40c0-9910-45d7c7b6e124",
+                                    "full_name": "Baba",
+                                    "phone_number": "+23495847453",
+                                    "profile_picture": "/media/static/profile_images/company_agents/Screenshot_from_2024-05-12_17-43-24.png"
+                                }
+                            ]
+                        }
+                    )
+                ]
+            )
+        }
+    )
+    def get(self, request):
+        user = request.user
+        company_profile = get_company_profile(user=user)
+        all_agents = company_profile.company_agents.all()
+
+        data = [
+            {
+                "id": agent.id,
+                "full_name": agent.full_name,
+                "phone_number": agent.phone_number,
+                "profile_picture": agent.profile_picture_url
+            }
+            for agent in all_agents
+        ]
+        return CustomResponse.success(message="Successfully retrieved company agents", data=data)
+
+
+class UpdateCompanyAgentView(APIView):
+    permission_classes = [IsAuthenticatedAgent]
+    serializer_class = RegisterCompanyAgentSerializer
+
+    @extend_schema(
+        summary="Update company agent",
+        description="""
+        This endpoint allows an authenticated company to update its workers agent profile
+        """,
+        tags=['Company Profile'],
+        responses={
+            status.HTTP_202_ACCEPTED: OpenApiResponse(
+                description="Successfully updated company agent",
+                response={'application/json'},
+                examples=[
+                    OpenApiExample(
+                        name="Success response",
+                        value={
+                            "status": "success",
+                            "message": "Successfully updated company agent",
+                            "data": {
+                                "full_name": "GadDam",
+                                "phone_number": "+4456788",
+                                "profile_picture": "/media/static/profile_images/company_agents/Screenshot_from_2024-05-12_17-43-24_hDaIgcA.png"
+                            }
+                        }
+                    )
+                ]
+            )
+        }
+    )
+    @transaction.atomic
+    def patch(self, request, *args, **kwargs):
+        agent_id = kwargs.get('agent_id')
+        user = request.user
+        company_profile = get_company_profile(user=user)
+        agent_profile = get_company_agent(company_profile=company_profile, agent_id=agent_id)
+
+        serializer = self.serializer_class(agent_profile, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serialized_data = self.serializer_class(serializer.save()).data
+        return CustomResponse.success(message="Successfully updated company agent", data=serialized_data,
                                       status_code=status.HTTP_202_ACCEPTED)
 
 
@@ -780,7 +933,40 @@ class RetrieveAllFavoritesPropertyView(APIView):
         responses={
             status.HTTP_200_OK: OpenApiResponse(
                 description="Successfully retrieved favorite properties",
-                response=PropertyAdSerializer(many=True)
+                response={'application/json'},
+                examples=[
+                    OpenApiExample(
+                        name="Success response",
+                        value={
+                            "status": "success",
+                            "message": "Successfully retrieved favorite properties",
+                            "data": [
+                                {
+                                    "media_urls": [
+                                        "/media/property_media/7179060_1F5N9rZ.jpg",
+                                        "/media/property_media/7179095_Lxd9Y9v.jpg",
+                                        "/media/property_media/7179104_oWThtIz.jpg"
+                                    ],
+                                    "discounted_price": 926250,
+                                    "lister": "admin@gmail.com",
+                                    "lister_name": "John Doe",
+                                    "property_type": "6aec02ba-8c5c-445d-bca4-6d3a555095b5",
+                                    "property_type_name": "Apartment",
+                                    "property_state": "c3b37a05-3978-452d-b118-35ec6e754613",
+                                    "property_state_name": "Renovated",
+                                    "ad_category": "057dc877-064b-449a-a178-35d02cf80aa1",
+                                    "ad_category_name": "Buy",
+                                    "features": [
+                                        "dab34afa-5a47-4834-8838-3e443d0818ed"
+                                    ],
+                                    "feature_names": [
+                                        "Pool"
+                                    ]
+                                }
+                            ]
+                        }
+                    )
+                ]
             )
         }
     )
@@ -827,6 +1013,20 @@ class CreateDeleteFavoritePropertyView(APIView):
                         }
                     )
                 ]
+            ),
+            status.HTTP_409_CONFLICT: OpenApiResponse(
+                description="Property already exists in favorites",
+                response={'application/json'},
+                examples=[
+                    OpenApiExample(
+                        name="Conflict response",
+                        value={
+                            "status": "failure",
+                            "message": "Property already exists in favorites",
+                            "code": "already_exists"
+                        }
+                    )
+                ]
             )
         }
     )
@@ -837,7 +1037,11 @@ class CreateDeleteFavoritePropertyView(APIView):
         property_ad = get_single_property(property_id=property_id)
 
         # Create property object
-        FavoriteProperty.objects.create(property=property_ad, user=user)
+        try:
+            FavoriteProperty.objects.create(property=property_ad, user=user)
+        except IntegrityError:
+            raise RequestError(err_code=ErrorCode.ALREADY_EXISTS, err_msg="Property already exists in favorites",
+                               status_code=status.HTTP_409_CONFLICT)
         return CustomResponse.success(message="Successfully added property to favorites")
 
     @extend_schema(

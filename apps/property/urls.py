@@ -3,7 +3,7 @@ from django.urls import path
 from apps.property.views import *
 
 urlpatterns = [
-    path('agent/dashboard', RetrieveAgentDashboardView.as_view(), name='agent-dashboard'),
+    path('company/dashboard', RetrieveCompanyDashboardView.as_view(), name='agent-dashboard'),
     path('terminate/ad/<str:property_id>', TerminatePropertyAdView.as_view(), name='terminate-property-ad'),
     path('dashboard/search', SearchAgentDashboardView.as_view(), name='search-dashboard'),
     path('property/filter/agent', RetrieveFilteredAdsView.as_view(), name='agent-filtered-ads'),
@@ -15,9 +15,12 @@ urlpatterns = [
     path('create/ad', CreatePropertyAdView.as_view(), name='create-property-ad'),
     path('retrieve/update/delete/ad/<str:id>', RetrieveUpdateDeletePropertyAdView.as_view(),
          name='retrieve-update-property-ad'),
-    path('agent-profile/details', RetrieveUpdateAgentProfileView.as_view(), name='retrieve-update-delete-agent'),
+    path('company-profile/details', RetrieveUpdateCompanyProfileView.as_view(), name='retrieve-update-delete-agent'),
     path('favorite/properties/<str:id>', CreateDeleteFavoritePropertyView.as_view(),
          name='create-delete-favorite-property'),
     path('favorite/all', RetrieveAllFavoritesPropertyView.as_view(),
          name='retrieve-all-favorite-properties'),
+    path('create/agents', RegisterCompanyAgentView.as_view(), name='register-company-agent'),
+    path('company/agents/all', RetrieveAllCompanyAgentView.as_view(), name='retrieve-all-company-agents'),
+    path('company/agent/<str:agent_id>/update', UpdateCompanyAgentView.as_view(), name='update-company-agent'),
 ]

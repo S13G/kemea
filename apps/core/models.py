@@ -50,8 +50,8 @@ class OTPSecret(BaseModel):
         return self.user.email
 
 
-class AgentProfile(BaseModel):
-    user = models.OneToOneField(User, on_delete=models.CASCADE, null=True, related_name='agent_profile')
+class CompanyProfile(BaseModel):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, null=True, related_name='company_profile')
     company_name = models.CharField(max_length=255, null=True)
     license_number = models.CharField(max_length=255, null=True)
     image = models.ImageField(upload_to="static/profile_images", null=True, blank=True)
@@ -69,6 +69,20 @@ class AgentProfile(BaseModel):
     @property
     def background_image_url(self):
         return self.background_image.url if self.background_image else ""
+
+
+class CompanyAgent(BaseModel):
+    company = models.ForeignKey(CompanyProfile, on_delete=models.CASCADE, null=True, related_name='company_agents')
+    full_name = models.CharField(max_length=255, null=True)
+    phone_number = models.CharField(max_length=100, null=True, validators=[validate_phone_number])
+    profile_picture = models.ImageField(upload_to="static/profile_images/company_agents", null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.full_name} - {self.company.company_name}"
+
+    @property
+    def profile_picture_url(self):
+        return self.profile_picture.url if self.profile_picture else ""
 
 
 class NormalProfile(BaseModel):

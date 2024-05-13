@@ -4,7 +4,7 @@ from rest_framework import status
 
 from apps.common.errors import ErrorCode
 from apps.common.exceptions import RequestError
-from apps.core.models import AgentProfile
+from apps.core.models import CompanyProfile, CompanyAgent
 from apps.property.models import Property, PropertyMedia, FavoriteProperty, PropertyFeature
 from apps.property.serializers import PropertyAdSerializer
 
@@ -112,11 +112,11 @@ def update_media(property_ad, media_data):
         PropertyMedia.objects.bulk_create(property_images)
 
 
-def get_agent_profile(user):
+def get_company_profile(user):
     try:
-        return AgentProfile.objects.select_related('user').get(user=user)
-    except AgentProfile.DoesNotExist:
-        raise RequestError(err_code=ErrorCode.NON_EXISTENT, err_msg="Agent profile not found",
+        return CompanyProfile.objects.select_related('user').get(user=user)
+    except CompanyProfile.DoesNotExist:
+        raise RequestError(err_code=ErrorCode.NON_EXISTENT, err_msg="Company profile not found",
                            status_code=status.HTTP_404_NOT_FOUND)
 
 
@@ -158,3 +158,22 @@ def handle_property_creation(validated_data, user):
                            status_code=status.HTTP_409_CONFLICT)
 
     return PropertyAdSerializer(property_ad).data
+
+
+def create_company_agent(company_profile, validated_data):
+    created_profile = CompanyAgent.objects.create(company=company_profile, **validated_data)
+    return {
+        "company_id": company_profile.id,
+        "company_name": company_profile.company_name,
+        "full_name": created_profile.full_name,
+        "phone_number": created_profile.phone_number,
+        "image": created_profile.profile_picture_url
+    }
+
+
+def get_company_agent(company_profile, agent_id):
+    try:
+        return CompanyAgent.objects.get(company=company_profile, id=agent_id)
+    except CompanyAgent.DoesNotExist:
+        raise RequestError(err_code=ErrorCode.NON_EXISTENT, err_msg="Agent not found",
+                           status_code=status.HTTP_404_NOT_FOUND)

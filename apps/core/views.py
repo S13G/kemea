@@ -14,7 +14,7 @@ from apps.common.exceptions import RequestError
 from apps.common.permissions import IsAuthenticatedUser
 from apps.common.responses import CustomResponse
 from apps.core.emails import send_otp_email
-from apps.core.models import NormalProfile, AgentProfile
+from apps.core.models import NormalProfile, CompanyProfile
 from apps.core.selectors import get_existing_user, get_user, validate_otp_secret_code, get_otp_secret, \
     verify_otp, verify_otp_expiration, authenticate_user, check_email_verification, get_user_profile, \
     generate_response
@@ -49,13 +49,13 @@ class NormalRegistrationView(APIView):
             ),
             status.HTTP_409_CONFLICT: OpenApiResponse(
                 response={"application/json"},
-                description="Account already exists and has an agent profile",
+                description="Account already exists and has an company profile",
                 examples=[
                     OpenApiExample(
                         name="Agent Conflict response",
                         value={
                             "status": "failure",
-                            "message": "Account already exists and has an agent profile",
+                            "message": "Account already exists and has an company profile",
                             "code": "already_exists"
                         }
                     ),
@@ -98,8 +98,8 @@ class NormalRegistrationView(APIView):
                                       status_code=status.HTTP_201_CREATED, data=data)
 
 
-class AgentRegistrationView(APIView):
-    serializer_class = AgentRegisterSerializer
+class CompanyRegistrationView(APIView):
+    serializer_class = CompanyRegisterSerializer
 
     @extend_schema(
         summary="Agent Registration",
@@ -112,17 +112,17 @@ class AgentRegistrationView(APIView):
         responses={
             status.HTTP_201_CREATED: OpenApiResponse(
                 description="Registration successful, check your email for verification.",
-                response=AgentProfileSerializer,
+                response=CompanyProfileSerializer,
             ),
             status.HTTP_409_CONFLICT: OpenApiResponse(
                 response={"application/json"},
-                description="Account already exists and has an agent profile",
+                description="Account already exists and has an company profile",
                 examples=[
                     OpenApiExample(
                         name="Agent Conflict response",
                         value={
                             "status": "failure",
-                            "message": "Account already exists and has an agent profile",
+                            "message": "Account already exists and has an company profile",
                             "code": "already_exists"
                         }
                     ),
@@ -153,13 +153,13 @@ class AgentRegistrationView(APIView):
 
         try:
             user = User.objects.create_user(**serializer.validated_data, is_agent=True)
-            user_profile = AgentProfile.objects.create(user=user, company_name=company_name,
-                                                       license_number=licence_number)
+            user_profile = CompanyProfile.objects.create(user=user, company_name=company_name,
+                                                         license_number=licence_number)
         except Exception as e:
             raise RequestError(err_code=ErrorCode.OTHER_ERROR, err_msg=str(e),
                                status_code=status.HTTP_400_BAD_REQUEST)
 
-        data = AgentProfileSerializer(user_profile).data
+        data = CompanyProfileSerializer(user_profile).data
 
         # Send OTP
         send_otp_email(user=user, template='email_verification.html')
