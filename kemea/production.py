@@ -10,8 +10,6 @@ CLOUDINARY_STORAGE = {
 
 DEBUG = False
 
-DEBUG_PROPAGATE_EXCEPTIONS = True
-
 ALLOWED_HOSTS = ['kemea.up.railway.app']
 
 CSRF_TRUSTED_ORIGINS = ["https://" + host for host in ALLOWED_HOSTS]
