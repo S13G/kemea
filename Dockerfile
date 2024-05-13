@@ -10,7 +10,7 @@ RUN apk add --no-cache postgresql-dev gcc musl-dev
 RUN addgroup systemUserGroup && adduser -D -G systemUserGroup developer
 
 # Grant executable permission to the group for the workdir
-RUN chmod g+s /wejpal
+RUN chmod g+s /kemea
 
 # Switch to the user
 USER developer
@@ -43,8 +43,8 @@ USER root
 
 # Create the staticfiles directory and set permissions
 RUN mkdir -p /kemea/staticfiles \
-    && chown -R developer:systemUserGroup /wejpal/staticfiles \
-    && chmod -R 775 /wejpal/staticfiles
+    && chown -R developer:systemUserGroup /kemea/staticfiles \
+    && chmod -R 775 /kemea/staticfiles
 
 # Switch back to the developer user
 USER developer
