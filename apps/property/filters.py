@@ -3,7 +3,7 @@ from datetime import timedelta
 from django.utils import timezone
 from django_filters import FilterSet, filters
 
-from apps.property.models import AdCategory, PropertyType, PropertyFeature, Property
+from apps.property.models import AdCategory, Property
 
 
 class AdFilter(FilterSet):
@@ -12,14 +12,14 @@ class AdFilter(FilterSet):
 
 
 class PropertyAdFilter(FilterSet):
-    property_type = filters.ModelChoiceFilter(field_name='property_type', queryset=PropertyType.objects.all())
+    property_type = filters.CharFilter(field_name='property_type__name', lookup_expr='exact')
     price_min = filters.NumberFilter(field_name='price', lookup_expr='gte')
     price_max = filters.NumberFilter(field_name='price', lookup_expr='lte')
     surface_build_min = filters.NumberFilter(field_name='surface_build', lookup_expr='gte')
     surface_build_max = filters.NumberFilter(field_name='surface_build', lookup_expr='lte')
     rooms = filters.NumberFilter(field_name='number_of_rooms')
     floors = filters.NumberFilter(field_name='floors')
-    features = filters.ModelMultipleChoiceFilter(field_name='features__name', queryset=PropertyFeature.objects.all())
+    features = filters.CharFilter(field_name='features__name', lookup_expr='exact')
 
     # Custom filter for last week
     last_week = filters.BooleanFilter(method='filter_last_week')
