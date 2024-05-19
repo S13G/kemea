@@ -85,6 +85,17 @@ class CompanyAgent(BaseModel):
         return self.profile_picture.url if self.profile_picture else ""
 
 
+class CompanyAvailability(BaseModel):
+    company = models.ForeignKey(CompanyProfile, on_delete=models.CASCADE, null=True, related_name='available_days')
+    start_day = models.CharField(max_length=20, null=True)
+    last_day = models.CharField(max_length=20, null=True)
+    start_time = models.TimeField(null=True)
+    end_time = models.TimeField(null=True)
+
+    def __str__(self):
+        return f"{self.company.company_name} - {self.days}"
+
+
 class NormalProfile(BaseModel):
     user = models.OneToOneField(User, on_delete=models.CASCADE, null=True, related_name='profile')
     image = models.ImageField(upload_to="static/profile_images", null=True, blank=True)

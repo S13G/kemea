@@ -9,15 +9,17 @@ from apps.common.errors import ErrorCode
 from apps.common.exceptions import RequestError
 from apps.common.permissions import IsAuthenticatedAgent
 from apps.common.responses import CustomResponse
+from apps.core.models import CompanyAvailability
 from apps.core.serializers import CompanyProfileSerializer
 from apps.property.choices import APPROVED
 from apps.property.filters import AdFilter, PropertyAdFilter
-from apps.property.models import Property, AdCategory, PropertyType, PropertyState, PropertyFeature, FavoriteProperty
+from apps.property.models import Property, AdCategory, PropertyType, PropertyState, PropertyFeature, FavoriteProperty, \
+    PromoteAdRequest
 from apps.property.selectors import get_dashboard_details, terminate_property_ad, get_searched_property_ads, \
     get_property_for_user, get_company_profile, get_favorite_properties, get_single_property, \
     handle_property_creation, update_property, create_company_agent, get_company_agent
 from apps.property.serializers import CreatePropertyAdSerializer, PropertyAdSerializer, FavoritePropertySerializer, \
-    RegisterCompanyAgentSerializer
+    RegisterCompanyAgentSerializer, PromoteAdSerializer, MultipleAvailabilitySerializer
 
 # Create your views here.
 
@@ -47,7 +49,7 @@ class RetrieveCompanyDashboardView(APIView):
                             "status": "success",
                             "message": "Successfully retrieved agent dashboard",
                             "data": {
-                                "full_name": "Ayomide Alonge",
+                                "full_name": "Sieg Domain",
                                 "num_of_property_ads": 1,
                                 "all_property_ads": [
                                     {
@@ -195,7 +197,8 @@ class RetrieveFilteredAdsView(APIView):
                 "This endpoint allows an authenticated normal user to filter properties."
         ),
         parameters=[
-            OpenApiParameter(name="ad_category", description="Type of property ad", required=False),
+            OpenApiParameter(name='ad_category', description="Type of ad category", required=False,
+                             type=OpenApiTypes.STR, enum=AdCategory.objects.values_list('name', flat=True)),
         ],
         tags=['Property'],
         responses={
@@ -543,7 +546,8 @@ class RetrieveUpdateDeletePropertyAdView(APIView):
         property_ad = get_property_for_user(request.user, property_id=property_id)
 
         if not property_ad:
-            raise RequestError(status_code=status.HTTP_404_NOT_FOUND, err_msg="Property not found")
+            raise RequestError(status_code=status.HTTP_404_NOT_FOUND, err_msg="Property not found",
+                               err_code=ErrorCode.NON_EXISTENT)
 
         serializer = self.serializer_class(data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
@@ -915,8 +919,48 @@ class UpdateCompanyAgentView(APIView):
                                       status_code=status.HTTP_202_ACCEPTED)
 
 
+class CreateCompanyTimeView(APIView):
+    permission_classes = [IsAuthenticatedAgent]
+    serializer_class = MultipleAvailabilitySerializer
+
+    @extend_schema(
+        summary="Create company time",
+        description="""
+        This endpoint allows an authenticated company to create company time
+        """,
+        tags=['Company Profile'],
+        responses={
+            status.HTTP_202_ACCEPTED: OpenApiResponse(
+                description="Successfully created company time",
+                response={'application/json'},
+                examples=[
+                    OpenApiExample(
+                        name="Success response",
+                        value={
+                            "status": "success",
+                            "message": "Successfully created company time",
+                        }
+                    )
+                ]
+            )
+        }
+    )
+    @transaction.atomic
+    def post(self, request):
+        user = request.user
+        company_profile = get_company_profile(user=user)
+        serializer = self.serializer_class(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        availabilities_data = serializer.validated_data.pop('availabilities')
+        for availability_data in availabilities_data:
+            CompanyAvailability.objects.create(company=company_profile, **availability_data)
+
+        return CustomResponse.success(message="Successfully created company time")
+
+
 """
-REGISTERED USERS
+REGISTERED AND UNREGISTERED USERS
 """
 
 
@@ -1140,3 +1184,79 @@ class RetrievePropertyAdDetailsView(APIView):
 
         serialized_data = PropertyAdSerializer(property_ad).data
         return CustomResponse.success(message="Successfully retrieved property ad", data=serialized_data)
+
+
+class PromoteBuyAdView(APIView):
+    serializer_class = PromoteAdSerializer
+
+    @extend_schema(
+        summary="Promote buy ad",
+        description="""
+            This endpoint allows both unauthenticated and authenticated user to request a property(buy/rent) to be promoted
+            """,
+        tags=['Promote with us'],
+        responses={
+            status.HTTP_200_OK: OpenApiResponse(
+                description="Successfully promoted property ad",
+                response={'application/json'},
+                examples=[
+                    OpenApiExample(
+                        name="Success response",
+                        value={
+                            "status": "success",
+                            "message": "Successfully submitted ad promotion request"
+                        }
+                    )
+                ]
+            )
+        }
+    )
+    @transaction.atomic
+    def post(self, request):
+        serializer = self.serializer_class(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            PromoteAdRequest.objects.create(**serializer.validated_data, buy_or_rent=True)
+        except Exception as e:
+            raise RequestError(err_code=ErrorCode.OTHER_ERROR, err_msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+
+        return CustomResponse.success(message="Successfully submitted ad promotion request")
+
+
+class PromoteSellAdView(APIView):
+    serializer_class = PromoteAdSerializer
+
+    @extend_schema(
+        summary="Promote sell ad",
+        description="""
+            This endpoint allows both unauthenticated and authenticated user to request a property(sell) to be promoted
+            """,
+        tags=['Promote with us'],
+        responses={
+            status.HTTP_200_OK: OpenApiResponse(
+                description="Successfully promoted property ad",
+                response={'application/json'},
+                examples=[
+                    OpenApiExample(
+                        name="Success response",
+                        value={
+                            "status": "success",
+                            "message": "Successfully submitted ad promotion request"
+                        }
+                    )
+                ]
+            )
+        }
+    )
+    @transaction.atomic
+    def post(self, request):
+        serializer = self.serializer_class(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            PromoteAdRequest.objects.create(**serializer.validated_data, sell=True)
+        except Exception as e:
+            raise RequestError(err_code=ErrorCode.OTHER_ERROR, err_msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+
+        return CustomResponse.success(message="Successfully submitted ad promotion request")

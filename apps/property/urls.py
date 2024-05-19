@@ -23,4 +23,6 @@ urlpatterns = [
     path('create/agents', RegisterCompanyAgentView.as_view(), name='register-company-agent'),
     path('company/agents/all', RetrieveAllCompanyAgentView.as_view(), name='retrieve-all-company-agents'),
     path('company/agent/<str:agent_id>/update', UpdateCompanyAgentView.as_view(), name='update-company-agent'),
+    path('promote/buy', PromoteBuyAdView.as_view(), name='promote-buy-ad'),
+    path('promote/sell', PromoteSellAdView.as_view(), name='promote-sell-ad'),
 ]

@@ -107,3 +107,20 @@ class FavoriteProperty(BaseModel):
 
     def __str__(self):
         return self.user.full_name
+
+
+class PromoteAdRequest(BaseModel):
+    location = models.CharField(max_length=255)
+    property_type = models.CharField(max_length=255)
+    surface = models.PositiveIntegerField(default=0)
+    rooms = models.PositiveIntegerField(default=0)
+    desired_price = models.DecimalField(max_digits=10, decimal_places=2)
+    first_name = models.CharField(max_length=255)
+    last_name = models.CharField(max_length=255)
+    email_address = models.EmailField()
+    phone_number = models.CharField(max_length=255, validators=[validate_phone_number])
+    buy_or_rent = models.BooleanField(default=False)
+    sell = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"{self.location} - {self.desired_price}"

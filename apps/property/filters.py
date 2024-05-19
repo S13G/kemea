@@ -7,8 +7,7 @@ from apps.property.models import AdCategory, Property
 
 
 class AdFilter(FilterSet):
-    ad_category = filters.ModelChoiceFilter(queryset=AdCategory.objects.all())
-    # ad_category__name = filters.CharFilter(lookup_expr='exact')
+    ad_category = filters.CharFilter(field_name='ad_category__name', lookup_expr='exact')
 
 
 class PropertyAdFilter(FilterSet):
