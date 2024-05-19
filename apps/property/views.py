@@ -919,44 +919,44 @@ class UpdateCompanyAgentView(APIView):
                                       status_code=status.HTTP_202_ACCEPTED)
 
 
-class CreateCompanyTimeView(APIView):
-    permission_classes = [IsAuthenticatedAgent]
-    serializer_class = MultipleAvailabilitySerializer
-
-    @extend_schema(
-        summary="Create company time",
-        description="""
-        This endpoint allows an authenticated company to create company time
-        """,
-        tags=['Company Profile'],
-        responses={
-            status.HTTP_202_ACCEPTED: OpenApiResponse(
-                description="Successfully created company time",
-                response={'application/json'},
-                examples=[
-                    OpenApiExample(
-                        name="Success response",
-                        value={
-                            "status": "success",
-                            "message": "Successfully created company time",
-                        }
-                    )
-                ]
-            )
-        }
-    )
-    @transaction.atomic
-    def post(self, request):
-        user = request.user
-        company_profile = get_company_profile(user=user)
-        serializer = self.serializer_class(data=request.data)
-        serializer.is_valid(raise_exception=True)
-
-        availabilities_data = serializer.validated_data.pop('availabilities')
-        for availability_data in availabilities_data:
-            CompanyAvailability.objects.create(company=company_profile, **availability_data)
-
-        return CustomResponse.success(message="Successfully created company time")
+# class CreateCompanyTimeView(APIView):
+#     permission_classes = [IsAuthenticatedAgent]
+#     serializer_class = MultipleAvailabilitySerializer
+#
+#     @extend_schema(
+#         summary="Create company time",
+#         description="""
+#         This endpoint allows an authenticated company to create company time
+#         """,
+#         tags=['Company Profile'],
+#         responses={
+#             status.HTTP_202_ACCEPTED: OpenApiResponse(
+#                 description="Successfully created company time",
+#                 response={'application/json'},
+#                 examples=[
+#                     OpenApiExample(
+#                         name="Success response",
+#                         value={
+#                             "status": "success",
+#                             "message": "Successfully created company time",
+#                         }
+#                     )
+#                 ]
+#             )
+#         }
+#     )
+#     @transaction.atomic
+#     def post(self, request):
+#         user = request.user
+#         company_profile = get_company_profile(user=user)
+#         serializer = self.serializer_class(data=request.data)
+#         serializer.is_valid(raise_exception=True)
+#
+#         availabilities_data = serializer.validated_data.pop('availabilities')
+#         for availability_data in availabilities_data:
+#             CompanyAvailability.objects.create(company=company_profile, **availability_data)
+#
+#         return CustomResponse.success(message="Successfully created company time")
 
 
 """

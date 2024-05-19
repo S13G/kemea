@@ -131,4 +131,4 @@ class CompanyAvailabilitySerializer(sr.ModelSerializer):
 
 
 class MultipleAvailabilitySerializer(sr.Serializer):
-    availabilities = sr.ListField(child=CompanyAvailabilitySerializer)
+    # availabilities = sr.ListField(child=CompanyAvailabilitySerializer)
