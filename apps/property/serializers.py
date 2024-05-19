@@ -130,5 +130,5 @@ class CompanyAvailabilitySerializer(sr.ModelSerializer):
         fields = ('start_day', 'last_day', 'start_time', 'end_time')
 
 
-class MultipleAvailabilitySerializer(sr.Serializer):
+# class MultipleAvailabilitySerializer(sr.Serializer):
     # availabilities = sr.ListField(child=CompanyAvailabilitySerializer)
