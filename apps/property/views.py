@@ -19,7 +19,7 @@ from apps.property.selectors import get_dashboard_details, terminate_property_ad
     get_property_for_user, get_company_profile, get_favorite_properties, get_single_property, \
     handle_property_creation, update_property, create_company_agent, get_company_agent
 from apps.property.serializers import CreatePropertyAdSerializer, PropertyAdSerializer, FavoritePropertySerializer, \
-    RegisterCompanyAgentSerializer, PromoteAdSerializer, MultipleAvailabilitySerializer
+    RegisterCompanyAgentSerializer, PromoteAdSerializer
 
 # Create your views here.
 
