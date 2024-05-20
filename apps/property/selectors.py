@@ -4,7 +4,7 @@ from rest_framework import status
 
 from apps.common.errors import ErrorCode
 from apps.common.exceptions import RequestError
-from apps.core.models import CompanyProfile, CompanyAgent
+from apps.core.models import CompanyProfile, CompanyAgent, CompanyAvailability
 from apps.property.models import Property, PropertyMedia, FavoriteProperty, PropertyFeature
 from apps.property.serializers import PropertyAdSerializer
 
@@ -120,6 +120,14 @@ def get_company_profile(user):
                            status_code=status.HTTP_404_NOT_FOUND)
 
 
+def get_company_availability(company_profile):
+    try:
+        return CompanyAvailability.objects.select_related('company').filter(company=company_profile)
+    except CompanyProfile.DoesNotExist:
+        raise RequestError(err_code=ErrorCode.NON_EXISTENT, err_msg="Availability not found",
+                           status_code=status.HTTP_404_NOT_FOUND)
+
+
 def get_favorite_properties(user):
     return FavoriteProperty.objects.filter(user=user)
 
@@ -177,3 +185,33 @@ def get_company_agent(company_profile, agent_id):
     except CompanyAgent.DoesNotExist:
         raise RequestError(err_code=ErrorCode.NON_EXISTENT, err_msg="Agent not found",
                            status_code=status.HTTP_404_NOT_FOUND)
+
+
+def handle_company_availability_creation(company, data):
+    availabilities = []
+    for availability_data in data:
+        availabilities.append(CompanyAvailability(company=company, **availability_data))
+
+    CompanyAvailability.objects.bulk_create(availabilities)
+
+
+def handle_company_availability_update(company, data):
+    for availability_data in data:
+        start_day = availability_data['start_day']
+        last_day = availability_data['last_day']
+
+        # Fetch the specific availability record
+        try:
+            availability = CompanyAvailability.objects.get(
+                company=company,
+                start_day=start_day,
+                last_day=last_day
+            )
+            # Update the fields
+            availability.start_time = availability_data['start_time']
+            availability.end_time = availability_data['end_time']
+            availability.save()
+        except CompanyAvailability.DoesNotExist:
+            # If it does not exist, specify error
+            raise RequestError(err_code=ErrorCode.NON_EXISTENT, err_msg="An availability doesn't exist",
+                               status_code=status.HTTP_404_NOT_FOUND)

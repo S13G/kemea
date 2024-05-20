@@ -9,7 +9,6 @@ from apps.common.errors import ErrorCode
 from apps.common.exceptions import RequestError
 from apps.common.permissions import IsAuthenticatedAgent
 from apps.common.responses import CustomResponse
-from apps.core.models import CompanyAvailability
 from apps.core.serializers import CompanyProfileSerializer
 from apps.property.choices import APPROVED
 from apps.property.filters import AdFilter, PropertyAdFilter
@@ -17,9 +16,10 @@ from apps.property.models import Property, AdCategory, PropertyType, PropertySta
     PromoteAdRequest
 from apps.property.selectors import get_dashboard_details, terminate_property_ad, get_searched_property_ads, \
     get_property_for_user, get_company_profile, get_favorite_properties, get_single_property, \
-    handle_property_creation, update_property, create_company_agent, get_company_agent
+    handle_property_creation, update_property, create_company_agent, get_company_agent, \
+    handle_company_availability_creation, get_company_availability, handle_company_availability_update
 from apps.property.serializers import CreatePropertyAdSerializer, PropertyAdSerializer, FavoritePropertySerializer, \
-    RegisterCompanyAgentSerializer, PromoteAdSerializer
+    RegisterCompanyAgentSerializer, PromoteAdSerializer, MultipleAvailabilitySerializer, CompanyAvailabilitySerializer
 
 # Create your views here.
 
@@ -634,7 +634,7 @@ class RetrieveUpdateCompanyProfileView(APIView):
                             "status": "success",
                             "message": "Successfully retrieved company profile",
                             "data": {
-                                "agent_info": {
+                                "company_info": {
                                     "user_id": "59af4ef1-8e58-47cf-9f1a-e7bae786b883",
                                     "id": "542ee57a-7a5e-4332-a9a7-4de9a775e570",
                                     "full_name": "John Doe",
@@ -647,6 +647,20 @@ class RetrieveUpdateCompanyProfileView(APIView):
                                     "location": "Rub",
                                     "website": "https://google.com"
                                 },
+                                "company_availability": [
+                                    {
+                                        "start_day": "Tuesday",
+                                        "last_day": "Thursday",
+                                        "start_time": "08:45:00",
+                                        "end_time": "19:00:00"
+                                    },
+                                    {
+                                        "start_day": "Sunday",
+                                        "last_day": "Thursday",
+                                        "start_time": "09:45:00",
+                                        "end_time": "19:00:00"
+                                    }
+                                ],
                                 "total_number_of_ads": 1,
                                 "ads": [
                                     {
@@ -707,13 +721,16 @@ class RetrieveUpdateCompanyProfileView(APIView):
     def get(self, request):
         user = request.user
         company_profile = get_company_profile(user=user)
+        company_availability = company_profile.available_days.all()
         serialized_data = self.serializer_class(company_profile).data
+        availability_data = CompanyAvailabilitySerializer(company_availability, many=True)
         queryset = Property.objects.filter(lister=user, ad_status=APPROVED, terminated=False)
         filtered_queryset = self.filterset_class(request.GET, queryset=queryset).qs.order_by('-created')
         total_number_of_ads = filtered_queryset.count()
 
         data = {
-            "agent_info": serialized_data,
+            "company_info": serialized_data,
+            "company_availability": availability_data.data,
             "total_number_of_ads": total_number_of_ads,
             "ads": [
                 {
@@ -919,44 +936,92 @@ class UpdateCompanyAgentView(APIView):
                                       status_code=status.HTTP_202_ACCEPTED)
 
 
-# class CreateCompanyTimeView(APIView):
-#     permission_classes = [IsAuthenticatedAgent]
-#     serializer_class = MultipleAvailabilitySerializer
-#
-#     @extend_schema(
-#         summary="Create company time",
-#         description="""
-#         This endpoint allows an authenticated company to create company time
-#         """,
-#         tags=['Company Profile'],
-#         responses={
-#             status.HTTP_202_ACCEPTED: OpenApiResponse(
-#                 description="Successfully created company time",
-#                 response={'application/json'},
-#                 examples=[
-#                     OpenApiExample(
-#                         name="Success response",
-#                         value={
-#                             "status": "success",
-#                             "message": "Successfully created company time",
-#                         }
-#                     )
-#                 ]
-#             )
-#         }
-#     )
-#     @transaction.atomic
-#     def post(self, request):
-#         user = request.user
-#         company_profile = get_company_profile(user=user)
-#         serializer = self.serializer_class(data=request.data)
-#         serializer.is_valid(raise_exception=True)
-#
-#         availabilities_data = serializer.validated_data.pop('availabilities')
-#         for availability_data in availabilities_data:
-#             CompanyAvailability.objects.create(company=company_profile, **availability_data)
-#
-#         return CustomResponse.success(message="Successfully created company time")
+class CreateCompanyTimeView(APIView):
+    permission_classes = [IsAuthenticatedAgent]
+    serializer_class = MultipleAvailabilitySerializer
+
+    @extend_schema(
+        summary="Create company time",
+        description="""
+        This endpoint allows an authenticated company to create company time
+        """,
+        tags=['Company Profile'],
+        responses={
+            status.HTTP_201_CREATED: OpenApiResponse(
+                description="Successfully created company time",
+                response={'application/json'},
+                examples=[
+                    OpenApiExample(
+                        name="Success response",
+                        value={
+                            "status": "success",
+                            "message": "Successfully created company time",
+                        }
+                    )
+                ]
+            ),
+        }
+    )
+    @transaction.atomic
+    def post(self, request):
+        user = request.user
+        company_profile = get_company_profile(user=user)
+        serializer = self.serializer_class(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        availabilities_data = serializer.validated_data.pop('availabilities')
+
+        handle_company_availability_creation(company=company_profile, data=availabilities_data)
+        return CustomResponse.success(message="Successfully created company time", status_code=status.HTTP_201_CREATED)
+
+    @extend_schema(
+        summary="Update company time",
+        description="""
+                This endpoint allows an authenticated company to update company available time
+                """,
+        tags=['Company Profile'],
+        responses={
+            status.HTTP_202_ACCEPTED: OpenApiResponse(
+                description="Successfully updated company availability",
+                response={'application/json'},
+                examples=[
+                    OpenApiExample(
+                        name="Success response",
+                        value={
+                            "status": "success",
+                            "message": "Successfully updated company time",
+                        }
+                    )
+                ]
+            ),
+            status.HTTP_404_NOT_FOUND: OpenApiResponse(
+                description="An availability doesn't exist",
+                response={'application/json'},
+                examples=[
+                    OpenApiExample(
+                        name="Not found response",
+                        value={
+                            "status": "failure",
+                            "message": "An availability doesn't exist",
+                            "code": "non_existent"
+                        }
+                    )
+                ]
+            )
+        }
+    )
+    @transaction.atomic
+    def patch(self, request):
+        user = request.user
+        company_profile = get_company_profile(user=user)
+        company_availability = get_company_availability(company_profile=company_profile)
+        serializer = self.serializer_class(company_availability, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+
+        availabilities_data = serializer.validated_data.pop('availabilities')
+
+        handle_company_availability_update(company=company_profile, data=availabilities_data)
+        return CustomResponse.success(message="Successfully updated company time", status_code=status.HTTP_202_ACCEPTED)
 
 
 """

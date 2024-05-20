@@ -1,7 +1,6 @@
 from django.contrib.auth import get_user_model
 from rest_framework import serializers as sr
 
-from apps.core.models import CompanyAvailability
 from apps.core.validators import validate_phone_number
 from apps.property.models import PropertyType, AdCategory, PropertyState, PropertyFeature, Property
 
@@ -124,11 +123,12 @@ class PromoteAdSerializer(sr.Serializer):
     phone_number = sr.CharField(validators=[validate_phone_number])
 
 
-class CompanyAvailabilitySerializer(sr.ModelSerializer):
-    class Meta:
-        model = CompanyAvailability
-        fields = ('start_day', 'last_day', 'start_time', 'end_time')
+class CompanyAvailabilitySerializer(sr.Serializer):
+    start_day = sr.CharField()
+    last_day = sr.CharField()
+    start_time = sr.TimeField()
+    end_time = sr.TimeField()
 
 
-# class MultipleAvailabilitySerializer(sr.Serializer):
-    # availabilities = sr.ListField(child=CompanyAvailabilitySerializer)
+class MultipleAvailabilitySerializer(sr.Serializer):
+    availabilities = sr.ListField(child=CompanyAvailabilitySerializer(), max_length=4)

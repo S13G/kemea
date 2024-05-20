@@ -93,7 +93,7 @@ class CompanyAvailability(BaseModel):
     end_time = models.TimeField(null=True)
 
     def __str__(self):
-        return f"{self.company.company_name} - {self.days}"
+        return self.company.company_name
 
 
 class NormalProfile(BaseModel):
