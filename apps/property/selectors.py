@@ -51,8 +51,7 @@ def get_searched_property_ads(search: str) -> list[Property]:
                                     Q(property_type__name__icontains=search) |
                                     Q(ad_category__name__icontains=search),
                                     ad_status=APPROVED, terminated=False)
-            .values('id', 'name', 'property_type__name',
-                    'ad_category__name', 'ad_status').order_by('-created'))
+            )
 
 
 def get_property_for_user(user: User, property_id: str) -> Property:

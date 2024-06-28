@@ -27,7 +27,7 @@ urlpatterns = [
     path('promote/sell', PromoteSellAdView.as_view(), name='promote-sell-ad'),
     path('company/availability', CreateCompanyTimeView.as_view(), name='add-company-availability'),
     path('listings/all', RetrieveAllPropertyAdListingView.as_view(), name='retrieve-all-property-ad-listings'),
-    path('listings/city/search', SearchPropertyListingsByCityView.as_view(),
+    path('listings/city', SearchPropertyListingsByCityView.as_view(),
          name='search-property-ad-listings-by-city'),
-    path('listings/search', SearchAllPropertyListingsView.as_view(), name='search-property-ad-listings'),
+    path('listings', SearchAllPropertyListingsView.as_view(), name='search-property-ad-listings'),
 ]

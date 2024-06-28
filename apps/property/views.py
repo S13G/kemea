@@ -1332,6 +1332,7 @@ class PromoteSellAdView(APIView):
 class RetrieveAllPropertyAdListingView(APIView):
     filter_backends = [DjangoFilterBackend]
     filterset_class = PropertyAdListingFilter
+    serializer_class = PropertyAdMiniSerializer
 
     @extend_schema(
         summary="Retrieve all property ad listings",
@@ -1350,7 +1351,37 @@ class RetrieveAllPropertyAdListingView(APIView):
         responses={
             status.HTTP_200_OK: OpenApiResponse(
                 description="Successfully retrieved property ads",
-                response=PropertyAdSerializer
+                response={'application/json'},
+                examples=[
+                    OpenApiExample(
+                        name="Success response",
+                        value={
+                            "status": "success",
+                            "message": "Successfully retrieved property ads",
+                            "data": {
+                                "total_listings": 1,
+                                "listings": [
+                                    {
+                                        "property": {
+                                            "id": "8e99122a-6646-4d72-bb94-872ba44bf953",
+                                            "image": "/media/property_media/7179060_1F5N9rZ.jpg",
+                                            "name": "Crazy Boe",
+                                            "ad_category": "057dc877-064b-449a-a178-35d02cf80aa1",
+                                            "ad_category_name": "Buy",
+                                            "number_of_rooms": 10,
+                                            "price": 975000,
+                                            "discounted_price": 926250,
+                                            "car_parking": 5,
+                                            "surface_build": 800,
+                                            "total_surface": 9000,
+                                            "lister_phone_number": "+12132131212"
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    )
+                ]
             )
         }
     )
@@ -1363,7 +1394,7 @@ class RetrieveAllPropertyAdListingView(APIView):
             "total_listings": total_number_of_ads,
             "listings": [
                 {
-                    "property": PropertyAdMiniSerializer(each_property).data,
+                    "property": self.serializer_class(each_property).data,
                 }
                 for each_property in filtered_queryset
             ]
@@ -1372,6 +1403,7 @@ class RetrieveAllPropertyAdListingView(APIView):
 
 
 class SearchPropertyListingsByCityView(APIView):
+    serializer_class = PropertyAdMiniSerializer
 
     @extend_schema(
         summary="Search property listings by city",
@@ -1385,7 +1417,37 @@ class SearchPropertyListingsByCityView(APIView):
         responses={
             status.HTTP_200_OK: OpenApiResponse(
                 description="Successfully retrieved property ads",
-                response=PropertyAdSerializer
+                response={'application/json'},
+                examples=[
+                    OpenApiExample(
+                        name="Success response",
+                        value={
+                            "status": "success",
+                            "message": "Successfully retrieved property ads",
+                            "data": {
+                                "total_listings": 1,
+                                "listings": [
+                                    {
+                                        "property": {
+                                            "id": "8e99122a-6646-4d72-bb94-872ba44bf953",
+                                            "image": "/media/property_media/7179060_1F5N9rZ.jpg",
+                                            "name": "Crazy Boe",
+                                            "ad_category": "057dc877-064b-449a-a178-35d02cf80aa1",
+                                            "ad_category_name": "Buy",
+                                            "number_of_rooms": 10,
+                                            "price": 975000,
+                                            "discounted_price": 926250,
+                                            "car_parking": 5,
+                                            "surface_build": 800,
+                                            "total_surface": 9000,
+                                            "lister_phone_number": "+12132131212"
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    )
+                ]
             )
         }
     )
@@ -1399,7 +1461,7 @@ class SearchPropertyListingsByCityView(APIView):
             "total_listings": total_number_of_ads,
             "listings": [
                 {
-                    "property": PropertyAdMiniSerializer(each_property).data,
+                    "property": self.serializer_class(each_property).data,
                 }
                 for each_property in queryset
             ]
@@ -1408,6 +1470,7 @@ class SearchPropertyListingsByCityView(APIView):
 
 
 class SearchAllPropertyListingsView(APIView):
+    serializer_class = PropertyAdMiniSerializer
 
     @extend_schema(
         summary="Search property listings",
@@ -1421,7 +1484,37 @@ class SearchAllPropertyListingsView(APIView):
         responses={
             status.HTTP_200_OK: OpenApiResponse(
                 description="Successfully retrieved property ads",
-                response=PropertyAdSerializer
+                response={'application/json'},
+                examples=[
+                    OpenApiExample(
+                        name="Success response",
+                        value={
+                            "status": "success",
+                            "message": "Successfully retrieved property ads",
+                            "data": {
+                                "total_listings": 1,
+                                "listings": [
+                                    {
+                                        "property": {
+                                            "id": "8e99122a-6646-4d72-bb94-872ba44bf953",
+                                            "image": "/media/property_media/7179060_1F5N9rZ.jpg",
+                                            "name": "Crazy Boe",
+                                            "ad_category": "057dc877-064b-449a-a178-35d02cf80aa1",
+                                            "ad_category_name": "Buy",
+                                            "number_of_rooms": 10,
+                                            "price": 975000,
+                                            "discounted_price": 926250,
+                                            "car_parking": 5,
+                                            "surface_build": 800,
+                                            "total_surface": 9000,
+                                            "lister_phone_number": "+12132131212"
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    )
+                ]
             )
         }
     )
@@ -1434,7 +1527,7 @@ class SearchAllPropertyListingsView(APIView):
             "total_listings": get_property_ads.count(),
             "listings": [
                 {
-                    "property": PropertyAdMiniSerializer(each_property).data,
+                    "property": self.serializer_class(each_property).data,
                 }
                 for each_property in get_property_ads
             ]
