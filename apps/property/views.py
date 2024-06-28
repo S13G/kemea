@@ -21,7 +21,7 @@ from apps.property.selectors import get_dashboard_details, terminate_property_ad
     get_searched_property_ads_by_user
 from apps.property.serializers import CreatePropertyAdSerializer, PropertyAdSerializer, FavoritePropertySerializer, \
     RegisterCompanyAgentSerializer, PromoteAdSerializer, MultipleAvailabilitySerializer, CompanyAvailabilitySerializer, \
-    PropertyAdMiniSerializer
+    PropertyAdMiniSerializer, ContactAgentSerializer
 
 # Create your views here.
 
@@ -1554,6 +1554,35 @@ class RequestPropertyTourView(APIView):
                         value={
                             "status": "success",
                             "message": "Successfully submitted property tour request"
+                        }
+                    )
+                ]
+            )
+        }
+    )
+    def get(self, request):
+        pass
+
+
+class ContactAgentView(APIView):
+    serializer_class = ContactAgentSerializer
+
+    @extend_schema(
+        summary="Contact agent",
+        description="""
+            This endpoint allows an authenticated user to contact an agent
+            """,
+        tags=['Property'],
+        responses={
+            status.HTTP_200_OK: OpenApiResponse(
+                description="Successfully submitted contact request",
+                response={'application/json'},
+                examples=[
+                    OpenApiExample(
+                        name="Success response",
+                        value={
+                            "status": "success",
+                            "message": "Successfully submitted contact request"
                         }
                     )
                 ]
