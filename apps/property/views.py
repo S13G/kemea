@@ -13,7 +13,7 @@ from apps.core.serializers import CompanyProfileSerializer
 from apps.property.choices import APPROVED
 from apps.property.filters import AdFilter, PropertyAdFilter, PropertyAdListingFilter
 from apps.property.models import Property, AdCategory, PropertyType, PropertyState, PropertyFeature, FavoriteProperty, \
-    PromoteAdRequest
+    PromoteAdRequest, ContactCompany
 from apps.property.selectors import get_dashboard_details, terminate_property_ad, get_searched_property_ads, \
     get_property_for_user, get_company_profile, get_favorite_properties, get_single_property, \
     handle_property_creation, update_property, create_company_agent, get_company_agent, \
@@ -1574,7 +1574,7 @@ class ContactAgentView(APIView):
             """,
         tags=['Property'],
         responses={
-            status.HTTP_200_OK: OpenApiResponse(
+            status.HTTP_201_CREATED: OpenApiResponse(
                 description="Successfully submitted contact request",
                 response={'application/json'},
                 examples=[
@@ -1589,5 +1589,16 @@ class ContactAgentView(APIView):
             )
         }
     )
-    def get(self, request):
-        pass
+    @transaction.atomic
+    def post(self, request):
+        serializer = self.serializer_class(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        property_id = data.pop('property_id')
+
+        property_ad = get_single_property(property_id=property_id)
+
+        ContactCompany.objects.create(property=property_ad, company=property_ad.lister, **data)
+        return CustomResponse.success(message="Successfully submitted contact request",
+                                      status_code=status.HTTP_201_CREATED)

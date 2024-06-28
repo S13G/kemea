@@ -174,7 +174,7 @@ class MultipleAvailabilitySerializer(sr.Serializer):
 
 class ContactAgentSerializer(sr.Serializer):
     property_id = sr.UUIDField()
-    full_name = sr.CharField()
+    name = sr.CharField()
     email_address = sr.EmailField()
     phone_number = sr.CharField(validators=[validate_phone_number])
     message = sr.CharField()

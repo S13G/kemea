@@ -118,9 +118,24 @@ class PromoteAdRequest(BaseModel):
     first_name = models.CharField(max_length=255)
     last_name = models.CharField(max_length=255)
     email_address = models.EmailField()
-    phone_number = models.CharField(max_length=255, validators=[validate_phone_number])
+    phone_number = models.CharField(max_length=30, validators=[validate_phone_number])
     buy_or_rent = models.BooleanField(default=False)
     sell = models.BooleanField(default=False)
 
     def __str__(self):
         return f"{self.location} - {self.desired_price}"
+
+
+class ContactCompany(BaseModel):
+    property = models.ForeignKey(Property, on_delete=models.CASCADE, related_name='property_contact')
+    company = models.ForeignKey(User, on_delete=models.CASCADE, related_name='company_contact')
+    name = models.CharField(max_length=255)
+    email_address = models.EmailField()
+    phone_number = models.CharField(max_length=30, validators=[validate_phone_number])
+    message = models.TextField()
+
+    class Meta:
+        verbose_name_plural = "Contact Companies"
+
+    def __str__(self):
+        return self.name

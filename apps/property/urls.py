@@ -30,4 +30,5 @@ urlpatterns = [
     path('listings/city', SearchPropertyListingsByCityView.as_view(),
          name='search-property-ad-listings-by-city'),
     path('listings', SearchAllPropertyListingsView.as_view(), name='search-property-ad-listings'),
+    path('contact/company', ContactAgentView.as_view(), name='contact-agent'),
 ]
