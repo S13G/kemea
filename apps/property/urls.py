@@ -25,5 +25,9 @@ urlpatterns = [
     path('company/agent/<str:agent_id>/update', UpdateCompanyAgentView.as_view(), name='update-company-agent'),
     path('promote/buy', PromoteBuyAdView.as_view(), name='promote-buy-ad'),
     path('promote/sell', PromoteSellAdView.as_view(), name='promote-sell-ad'),
-    path('company/availability', CreateCompanyTimeView.as_view(), name='add-company-availability')
+    path('company/availability', CreateCompanyTimeView.as_view(), name='add-company-availability'),
+    path('listings/all', RetrieveAllPropertyAdListingView.as_view(), name='retrieve-all-property-ad-listings'),
+    path('listings/city/search', SearchPropertyListingsByCityView.as_view(),
+         name='search-property-ad-listings-by-city'),
+    path('listings/search', SearchAllPropertyListingsView.as_view(), name='search-property-ad-listings'),
 ]

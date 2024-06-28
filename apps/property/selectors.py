@@ -1,3 +1,4 @@
+from django.contrib.auth import get_user_model
 from django.db import IntegrityError
 from django.db.models import Q
 from rest_framework import status
@@ -5,17 +6,20 @@ from rest_framework import status
 from apps.common.errors import ErrorCode
 from apps.common.exceptions import RequestError
 from apps.core.models import CompanyProfile, CompanyAgent, CompanyAvailability
+from apps.property.choices import APPROVED
 from apps.property.models import Property, PropertyMedia, FavoriteProperty, PropertyFeature
 from apps.property.serializers import PropertyAdSerializer
 
+User = get_user_model()
 
-def get_dashboard_details(user):
+
+def get_dashboard_details(user: User) -> Property:
     return Property.objects.filter(lister=user) \
         .values('id', 'name', 'property_type__name', 'ad_category__name', 'ad_status') \
         .order_by('-created')
 
 
-def terminate_property_ad(user, ad_id):
+def terminate_property_ad(user: User, ad_id: str) -> None:
     try:
         property_ad = Property.objects.get(lister=user, id=ad_id)
 
@@ -31,7 +35,7 @@ def terminate_property_ad(user, ad_id):
                            status_code=status.HTTP_404_NOT_FOUND)
 
 
-def get_searched_property_ads(user, search):
+def get_searched_property_ads_by_user(user: User, search: str) -> list[Property]:
     return (Property.objects.filter(Q(name__icontains=search) | Q(ad_status__icontains=search) |
                                     Q(description__icontains=search) |
                                     Q(property_type__name__icontains=search) |
@@ -41,7 +45,17 @@ def get_searched_property_ads(user, search):
                     'ad_category__name', 'ad_status').order_by('-created'))
 
 
-def get_property_for_user(user, property_id):
+def get_searched_property_ads(search: str) -> list[Property]:
+    return (Property.objects.filter(Q(name__icontains=search) | Q(ad_status__icontains=search) |
+                                    Q(description__icontains=search) |
+                                    Q(property_type__name__icontains=search) |
+                                    Q(ad_category__name__icontains=search),
+                                    ad_status=APPROVED, terminated=False)
+            .values('id', 'name', 'property_type__name',
+                    'ad_category__name', 'ad_status').order_by('-created'))
+
+
+def get_property_for_user(user: User, property_id: str) -> Property:
     try:
         return Property.objects.get(lister=user, id=property_id)
     except Property.DoesNotExist:
@@ -49,7 +63,7 @@ def get_property_for_user(user, property_id):
                            status_code=status.HTTP_404_NOT_FOUND)
 
 
-def get_property_media(item_id, property_ad):
+def get_property_media(item_id: str, property_ad: Property) -> PropertyMedia:
     try:
         return PropertyMedia.objects.select_related('property').get(id=item_id, property=property_ad)
     except PropertyMedia.DoesNotExist:
@@ -57,7 +71,7 @@ def get_property_media(item_id, property_ad):
                            status_code=status.HTTP_404_NOT_FOUND)
 
 
-def update_property(serialized_data, property_ad):
+def update_property(serialized_data: dict, property_ad: Property) -> None:
     try:
         # Update specific fields from validated data (excluding features and media)
         for key, value in serialized_data.items():
@@ -81,7 +95,7 @@ def update_property(serialized_data, property_ad):
                            err_msg=f"An error occurred while updating the property ad: {e}")
 
 
-def update_features(property_ad, features):
+def update_features(property_ad: Property, features: list) -> None:
     existing_features = list(property_ad.features.all())  # Get existing features
 
     # Identify features to add or remove (set difference)
@@ -97,7 +111,7 @@ def update_features(property_ad, features):
     property_ad.features.remove(*features_to_remove)
 
 
-def update_media(property_ad, media_data):
+def update_media(property_ad: Property, media_data: list) -> None:
     existing_images = PropertyMedia.objects.filter(property=property_ad)
 
     # Delete existing images only if new images are provided
@@ -112,7 +126,7 @@ def update_media(property_ad, media_data):
         PropertyMedia.objects.bulk_create(property_images)
 
 
-def get_company_profile(user):
+def get_company_profile(user: User) -> CompanyProfile:
     try:
         return CompanyProfile.objects.select_related('user').get(user=user)
     except CompanyProfile.DoesNotExist:
@@ -120,7 +134,7 @@ def get_company_profile(user):
                            status_code=status.HTTP_404_NOT_FOUND)
 
 
-def get_company_availability(company_profile):
+def get_company_availability(company_profile: CompanyProfile) -> list[CompanyAvailability]:
     try:
         return CompanyAvailability.objects.select_related('company').filter(company=company_profile)
     except CompanyProfile.DoesNotExist:
@@ -128,11 +142,11 @@ def get_company_availability(company_profile):
                            status_code=status.HTTP_404_NOT_FOUND)
 
 
-def get_favorite_properties(user):
+def get_favorite_properties(user: User) -> list[FavoriteProperty]:
     return FavoriteProperty.objects.filter(user=user)
 
 
-def get_single_property(property_id):
+def get_single_property(property_id: str) -> Property:
     try:
         return Property.objects.get(id=property_id)
     except Property.DoesNotExist:
@@ -140,7 +154,7 @@ def get_single_property(property_id):
                            status_code=status.HTTP_404_NOT_FOUND)
 
 
-def handle_property_creation(validated_data, user):
+def handle_property_creation(validated_data: dict, user: User) -> dict:
     # Pop off features which are many to many
     features = validated_data.pop('features', [])
 
@@ -168,7 +182,7 @@ def handle_property_creation(validated_data, user):
     return PropertyAdSerializer(property_ad).data
 
 
-def create_company_agent(company_profile, validated_data):
+def create_company_agent(company_profile: CompanyProfile, validated_data: dict) -> dict:
     created_profile = CompanyAgent.objects.create(company=company_profile, **validated_data)
     return {
         "company_id": company_profile.id,
@@ -179,7 +193,7 @@ def create_company_agent(company_profile, validated_data):
     }
 
 
-def get_company_agent(company_profile, agent_id):
+def get_company_agent(company_profile: CompanyProfile, agent_id: str) -> CompanyAgent:
     try:
         return CompanyAgent.objects.get(company=company_profile, id=agent_id)
     except CompanyAgent.DoesNotExist:
@@ -187,7 +201,7 @@ def get_company_agent(company_profile, agent_id):
                            status_code=status.HTTP_404_NOT_FOUND)
 
 
-def handle_company_availability_creation(company, data):
+def handle_company_availability_creation(company: CompanyProfile, data: dict) -> None:
     availabilities = []
     for availability_data in data:
         availabilities.append(CompanyAvailability(company=company, **availability_data))
@@ -195,7 +209,7 @@ def handle_company_availability_creation(company, data):
     CompanyAvailability.objects.bulk_create(availabilities)
 
 
-def handle_company_availability_update(company, data):
+def handle_company_availability_update(company: CompanyProfile, data: dict) -> None:
     for availability_data in data:
         start_day = availability_data['start_day']
         last_day = availability_data['last_day']
@@ -213,5 +227,5 @@ def handle_company_availability_update(company, data):
             availability.save()
         except CompanyAvailability.DoesNotExist:
             # If it does not exist, specify error
-            raise RequestError(err_code=ErrorCode.NON_EXISTENT, err_msg="An availability doesn't exist",
+            raise RequestError(err_code=ErrorCode.NON_EXISTENT, err_msg="This availability doesn't exist",
                                status_code=status.HTTP_404_NOT_FOUND)

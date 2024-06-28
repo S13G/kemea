@@ -11,15 +11,17 @@ from apps.common.permissions import IsAuthenticatedAgent
 from apps.common.responses import CustomResponse
 from apps.core.serializers import CompanyProfileSerializer
 from apps.property.choices import APPROVED
-from apps.property.filters import AdFilter, PropertyAdFilter
+from apps.property.filters import AdFilter, PropertyAdFilter, PropertyAdListingFilter
 from apps.property.models import Property, AdCategory, PropertyType, PropertyState, PropertyFeature, FavoriteProperty, \
     PromoteAdRequest
 from apps.property.selectors import get_dashboard_details, terminate_property_ad, get_searched_property_ads, \
     get_property_for_user, get_company_profile, get_favorite_properties, get_single_property, \
     handle_property_creation, update_property, create_company_agent, get_company_agent, \
-    handle_company_availability_creation, get_company_availability, handle_company_availability_update
+    handle_company_availability_creation, get_company_availability, handle_company_availability_update, \
+    get_searched_property_ads_by_user
 from apps.property.serializers import CreatePropertyAdSerializer, PropertyAdSerializer, FavoritePropertySerializer, \
-    RegisterCompanyAgentSerializer, PromoteAdSerializer, MultipleAvailabilitySerializer, CompanyAvailabilitySerializer
+    RegisterCompanyAgentSerializer, PromoteAdSerializer, MultipleAvailabilitySerializer, CompanyAvailabilitySerializer, \
+    PropertyAdMiniSerializer
 
 # Create your views here.
 
@@ -181,7 +183,7 @@ class SearchAgentDashboardView(APIView):
     def get(self, request, *args, **kwargs):
         search = request.query_params.get('search', '')
 
-        get_property_ads = get_searched_property_ads(user=request.user, search=search)
+        get_property_ads = get_searched_property_ads_by_user(user=request.user, search=search)
 
         return CustomResponse.success(message="Successfully retrieved searched results", data=list(get_property_ads))
 
@@ -1002,7 +1004,7 @@ class CreateCompanyTimeView(APIView):
                         name="Not found response",
                         value={
                             "status": "failure",
-                            "message": "An availability doesn't exist",
+                            "message": "This availability doesn't exist",
                             "code": "non_existent"
                         }
                     )
@@ -1221,7 +1223,7 @@ class RetrievePropertyAdDetailsView(APIView):
         description="""
             This endpoint allows an authenticated user to retrieve a property ad details
             """,
-        tags=['Agent Dashboard'],
+        tags=['Property'],
         responses={
             status.HTTP_200_OK: OpenApiResponse(
                 description="Successfully retrieved property ad",
@@ -1325,3 +1327,145 @@ class PromoteSellAdView(APIView):
             raise RequestError(err_code=ErrorCode.OTHER_ERROR, err_msg=str(e), status_code=status.HTTP_400_BAD_REQUEST)
 
         return CustomResponse.success(message="Successfully submitted ad promotion request")
+
+
+class RetrieveAllPropertyAdListingView(APIView):
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = PropertyAdListingFilter
+
+    @extend_schema(
+        summary="Retrieve all property ad listings",
+        description="""
+            This endpoint allows an authenticated and unauthenticated user to retrieve all property ads
+            """,
+        tags=['Property'],
+        parameters=[
+            OpenApiParameter(name='ad_category', description="Type of ad category", required=False,
+                             type=OpenApiTypes.STR, enum=AdCategory.objects.values_list('name', flat=True)),
+            OpenApiParameter(name='property_type', description="Type of property", required=False,
+                             type=OpenApiTypes.STR, enum=PropertyType.objects.values_list('name', flat=True)),
+            OpenApiParameter(name='price_min', description="Minimum price", required=False, type=OpenApiTypes.FLOAT),
+            OpenApiParameter(name='price_max', description="Maximum price", required=False, type=OpenApiTypes.FLOAT),
+        ],
+        responses={
+            status.HTTP_200_OK: OpenApiResponse(
+                description="Successfully retrieved property ads",
+                response=PropertyAdSerializer
+            )
+        }
+    )
+    def get(self, request):
+        queryset = Property.objects.filter(ad_status=APPROVED, terminated=False)
+        filtered_queryset = self.filterset_class(request.GET, queryset=queryset).qs.order_by('-created')
+        total_number_of_ads = filtered_queryset.count()
+
+        serialized_data = {
+            "total_listings": total_number_of_ads,
+            "listings": [
+                {
+                    "property": PropertyAdMiniSerializer(each_property).data,
+                }
+                for each_property in filtered_queryset
+            ]
+        }
+        return CustomResponse.success(message="Successfully retrieved property ads", data=serialized_data)
+
+
+class SearchPropertyListingsByCityView(APIView):
+
+    @extend_schema(
+        summary="Search property listings by city",
+        description="""
+            This endpoint allows an authenticated and unauthenticated user to search property ads by city
+            """,
+        tags=['Property'],
+        parameters=[
+            OpenApiParameter(name='city', description="City", required=True, type=OpenApiTypes.STR),
+        ],
+        responses={
+            status.HTTP_200_OK: OpenApiResponse(
+                description="Successfully retrieved property ads",
+                response=PropertyAdSerializer
+            )
+        }
+    )
+    def get(self, request, *args, **kwargs):
+        search = request.query_params.get('city', '')
+
+        queryset = Property.objects.filter(ad_status=APPROVED, terminated=False, city__icontains=search)
+        total_number_of_ads = queryset.count()
+
+        serialized_data = {
+            "total_listings": total_number_of_ads,
+            "listings": [
+                {
+                    "property": PropertyAdMiniSerializer(each_property).data,
+                }
+                for each_property in queryset
+            ]
+        }
+        return CustomResponse.success(message="Successfully retrieved property ads", data=serialized_data)
+
+
+class SearchAllPropertyListingsView(APIView):
+
+    @extend_schema(
+        summary="Search property listings",
+        description="""
+            This endpoint allows an authenticated and unauthenticated user to search property ads by city
+            """,
+        tags=['Property'],
+        parameters=[
+            OpenApiParameter(name='search', description="Search query", required=True, type=OpenApiTypes.STR),
+        ],
+        responses={
+            status.HTTP_200_OK: OpenApiResponse(
+                description="Successfully retrieved property ads",
+                response=PropertyAdSerializer
+            )
+        }
+    )
+    def get(self, request, *args, **kwargs):
+        search = request.query_params.get('search', '')
+
+        get_property_ads = get_searched_property_ads(search=search)
+
+        serialized_data = {
+            "total_listings": get_property_ads.count(),
+            "listings": [
+                {
+                    "property": PropertyAdMiniSerializer(each_property).data,
+                }
+                for each_property in get_property_ads
+            ]
+        }
+
+        return CustomResponse.success(message="Successfully retrieved searched results", data=serialized_data)
+
+
+class RequestPropertyTourView(APIView):
+
+    @extend_schema(
+        summary="Request property tour",
+        description="""
+            This endpoint allows an authenticated user to request a property tour
+            """,
+        tags=['Property'],
+        responses={
+            status.HTTP_200_OK: OpenApiResponse(
+                description="Successfully submitted property tour request",
+                response={'application/json'},
+                examples=[
+                    OpenApiExample(
+                        name="Success response",
+                        value={
+                            "status": "success",
+                            "message": "Successfully submitted property tour request"
+                        }
+                    )
+                ]
+            )
+        }
+    )
+    def get(self, request):
+        pass

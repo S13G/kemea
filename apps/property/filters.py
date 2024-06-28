@@ -3,11 +3,18 @@ from datetime import timedelta
 from django.utils import timezone
 from django_filters import FilterSet, filters
 
-from apps.property.models import AdCategory, Property
+from apps.property.models import Property
 
 
 class AdFilter(FilterSet):
     ad_category = filters.CharFilter(field_name='ad_category__name', lookup_expr='exact')
+
+
+class PropertyAdListingFilter(FilterSet):
+    ad_category = filters.CharFilter(field_name='ad_category__name', lookup_expr='exact')
+    price_min = filters.NumberFilter(field_name='price', lookup_expr='gte')
+    price_max = filters.NumberFilter(field_name='price', lookup_expr='lte')
+    property_type = filters.CharFilter(field_name='property_type__name', lookup_expr='exact')
 
 
 class PropertyAdFilter(FilterSet):

@@ -34,7 +34,35 @@ class CreatePropertyAdSerializer(sr.Serializer):
     reachable_phone_number = sr.CharField(validators=[validate_phone_number])
 
 
+class PropertyAdMiniSerializer(sr.Serializer):
+    id = sr.UUIDField(read_only=True)
+    image = sr.SerializerMethodField()
+    name = sr.CharField()
+    ad_category = sr.PrimaryKeyRelatedField(queryset=AdCategory.objects.all())
+    ad_category_name = sr.StringRelatedField(source='ad_category')
+    number_of_rooms = sr.IntegerField()
+    price = sr.DecimalField(max_digits=10, decimal_places=2)
+    discounted_price = sr.SerializerMethodField()
+    car_parking = sr.IntegerField()
+    surface_build = sr.IntegerField()
+    total_surface = sr.IntegerField()
+    lister_phone_number = sr.SerializerMethodField()
+
+    @staticmethod
+    def get_lister_phone_number(obj):
+        return obj.lister.phone_number
+
+    @staticmethod
+    def get_image(obj):
+        return obj.property_media.first().media.url
+
+    @staticmethod
+    def get_discounted_price(obj):
+        return obj.discounted_price
+
+
 class PropertyAdSerializer(sr.ModelSerializer):
+    id = sr.UUIDField(read_only=True)
     media_urls = sr.SerializerMethodField()
     discounted_price = sr.SerializerMethodField()
     lister = sr.PrimaryKeyRelatedField(queryset=User.objects.all())
@@ -47,6 +75,7 @@ class PropertyAdSerializer(sr.ModelSerializer):
     ad_category_name = sr.StringRelatedField(source='ad_category')
     features = sr.PrimaryKeyRelatedField(many=True, queryset=PropertyFeature.objects.all())
     feature_names = sr.StringRelatedField(many=True, source='features')
+    lister_phone_number = sr.SerializerMethodField()
 
     class Meta:
         model = Property
@@ -55,6 +84,10 @@ class PropertyAdSerializer(sr.ModelSerializer):
     @staticmethod
     def get_discounted_price(obj):
         return obj.discounted_price
+
+    @staticmethod
+    def get_lister_phone_number(obj):
+        return obj.lister.phone_number
 
     @staticmethod
     def get_media_urls(obj):
@@ -77,6 +110,11 @@ class FavoritePropertySerializer(sr.Serializer):
     ad_category_name = sr.CharField(source='property.ad_category.name', read_only=True)
     features = sr.PrimaryKeyRelatedField(many=True, source="property.features", read_only=True)
     feature_names = sr.SerializerMethodField()  # Use the method to retrieve names
+    lister_phone_number = sr.SerializerMethodField()
+
+    @staticmethod
+    def get_lister_phone_number(obj):
+        return obj.lister.phone_number
 
     @staticmethod
     def get_feature_names(obj):
