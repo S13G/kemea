@@ -108,6 +108,7 @@ class CompanyProfileSerializer(sr.Serializer):
     license_number = sr.CharField()
     location = sr.CharField()
     website = sr.CharField()
+    created = sr.DateTimeField(read_only=True)
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
