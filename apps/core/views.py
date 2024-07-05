@@ -1,6 +1,5 @@
 from django.db import transaction
 from drf_spectacular.utils import OpenApiResponse, extend_schema, OpenApiExample
-from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 from rest_framework.views import APIView
@@ -9,15 +8,11 @@ from rest_framework_simplejwt.serializers import TokenBlacklistSerializer, Token
     TokenObtainPairSerializer
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenBlacklistView, TokenRefreshView
 
-from apps.common.errors import ErrorCode
-from apps.common.exceptions import RequestError
 from apps.common.permissions import IsAuthenticatedUser
 from apps.common.responses import CustomResponse
 from apps.core.emails import send_otp_email
 from apps.core.models import NormalProfile, CompanyProfile
-from apps.core.selectors import get_existing_user, get_user, validate_otp_secret_code, get_otp_secret, \
-    verify_otp, verify_otp_expiration, authenticate_user, check_email_verification, get_user_profile, \
-    generate_response
+from apps.core.selectors import *
 from apps.core.serializers import *
 from utilities.encryption import decrypt_token_to_profile, encrypt_profile_to_token
 
@@ -39,6 +34,8 @@ class NormalRegistrationView(APIView):
         description=(
                 """
                 This endpoint allows a user to register as a normal user on the platform
+                
+                This also returns to you the secret for the email which should be used for verification
                 """
         ),
         tags=['Registration'],
@@ -90,10 +87,15 @@ class NormalRegistrationView(APIView):
             raise RequestError(err_code=ErrorCode.OTHER_ERROR, err_msg=str(e),
                                status_code=status.HTTP_400_BAD_REQUEST)
 
-        data = NormalProfileSerializer(user_profile).data
+            # Generate one time otp secret
+        otp_secret = pyotp.random_base32()
 
-        # Send OTP
-        send_otp_email(user=user, template='email_verification.html')
+        data = {
+            "secret": otp_secret,
+            "user_data": NormalProfileSerializer(employee_instance).data
+        }
+
+        send_otp_email(otp_secret=otp_secret, recipient=user, template='email_verification.html')
         return CustomResponse.success(message="Registration successful, check your email for verification.",
                                       status_code=status.HTTP_201_CREATED, data=data)
 
@@ -106,6 +108,8 @@ class CompanyRegistrationView(APIView):
         description=(
                 """
                 This endpoint allows a user to register as an agent on the platform
+                This also returns to you the secret for the email which should be used for verification
+                This also returns to you the secret for the email which should be used for verification
                 """
         ),
         tags=['Registration'],
@@ -159,10 +163,15 @@ class CompanyRegistrationView(APIView):
             raise RequestError(err_code=ErrorCode.OTHER_ERROR, err_msg=str(e),
                                status_code=status.HTTP_400_BAD_REQUEST)
 
-        data = CompanyProfileSerializer(user_profile).data
+        # Generate one time otp secret
+        otp_secret = pyotp.random_base32()
 
-        # Send OTP
-        send_otp_email(user=user, template='email_verification.html')
+        data = {
+            "secret": otp_secret,
+            "user_data": CompanyProfileSerializer(employee_instance).data
+        }
+
+        send_otp_email(otp_secret=otp_secret, recipient=user, template='email_verification.html')
         return CustomResponse.success(message="Registration successful, check your email for verification.",
                                       status_code=status.HTTP_201_CREATED, data=data)
 
@@ -183,11 +192,12 @@ class VerifyEmailView(APIView):
 
         - `email_address`: The user's email address.
         - `otp`: The otp sent to the user's email address.
+        Pass in the email otp secret generated in the registration endpoint
         """,
         tags=['Email Verification'],
         responses={
             status.HTTP_200_OK: OpenApiResponse(
-                response={"status": "success", "message": "Email verification successful or already verified."},
+                response={"application/json"},
                 description="Email verification successful or already verified.",
                 examples=[
                     OpenApiExample(
@@ -200,7 +210,7 @@ class VerifyEmailView(APIView):
                     OpenApiExample(
                         name="Already verified response",
                         value={
-                            "status": "error",
+                            "status": "success",
                             "message": "Email already verified",
                             "code": "verified_user"
                         }
@@ -208,7 +218,7 @@ class VerifyEmailView(APIView):
                 ]
             ),
             status.HTTP_400_BAD_REQUEST: OpenApiResponse(
-                response={"status": "failure", "message": "Invalid OTP", "code": "incorrect_otp"},
+                response={"application/json"},
                 description="OTP Error",
                 examples=[
                     OpenApiExample(
@@ -218,19 +228,11 @@ class VerifyEmailView(APIView):
                             "message": "Invalid OTP",
                             "code": "incorrect_otp"
                         }
-                    ),
-                    OpenApiExample(
-                        name="Expired OTP response",
-                        value={
-                            "status": "failure",
-                            "message": "OTP has expired",
-                            "code": "expired_otp"
-                        }
                     )
                 ]
             ),
             status.HTTP_404_NOT_FOUND: OpenApiResponse(
-                response={"status": "failure", "message": "Not found", "code": "non_existent"},
+                response={"application/json"},
                 description="Not found",
                 examples=[
                     OpenApiExample(
@@ -240,28 +242,14 @@ class VerifyEmailView(APIView):
                             "message": "User with this email not found",
                             "code": "non_existent"
                         }
-                    ),
-                    OpenApiExample(
-                        name="No otp found response",
-                        value={
-                            "status": "failure",
-                            "message": "No OTP found for this account",
-                            "code": "non_existent"
-                        }
-                    ),
-                    OpenApiExample(
-                        name="No OTP secret found response",
-                        value={
-                            "status": "failure",
-                            "message": "No OTP secret found for this account",
-                            "code": "non_existent"
-                        }
                     )
                 ]
             )
         }
     )
-    def post(self, request):
+    def post(self, request, *args, **kwargs):
+        otp_secret = kwargs.get('otp_secret')
+
         serializer = self.serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
         email = serializer.validated_data.get('email')
@@ -273,12 +261,11 @@ class VerifyEmailView(APIView):
             raise RequestError(err_code=ErrorCode.VERIFIED_USER, err_msg="Email verified already",
                                status_code=status.HTTP_200_OK)
 
-        validate_otp_secret_code(user=user, code=code)
+        otp_verification(otp_secret=otp_secret, code=code)
 
         # OTP verification successful
         user.email_verified = True
         user.save()
-        user.otp_secret.delete()
 
         return CustomResponse.success(message="Email verification successful.")
 
@@ -297,8 +284,7 @@ class ResendEmailVerificationCodeView(APIView):
         tags=['Email Verification'],
         responses={
             status.HTTP_200_OK: OpenApiResponse(
-                response={"status": "success",
-                          "message": "Verification code sent successfully. Please check your mail."},
+                response={"application/json"},
                 description="Verification code sent successfully. Please check your mail.",
                 examples=[
                     OpenApiExample(
@@ -311,7 +297,7 @@ class ResendEmailVerificationCodeView(APIView):
                     OpenApiExample(
                         name="Already verified response",
                         value={
-                            "status": "error",
+                            "status": "success",
                             "message": "Email already verified",
                             "error_code": "already_verified"
                         }
@@ -319,7 +305,7 @@ class ResendEmailVerificationCodeView(APIView):
                 ]
             ),
             status.HTTP_404_NOT_FOUND: OpenApiResponse(
-                response={"status": "failure", "message": "User with this email not found", "code": "non_existent"},
+                response={"application/json"},
                 description="User with this email not found",
                 examples=[
                     OpenApiExample(
@@ -345,8 +331,13 @@ class ResendEmailVerificationCodeView(APIView):
             raise RequestError(err_code=ErrorCode.VERIFIED_USER, err_msg="Email already verified",
                                status_code=status.HTTP_200_OK)
 
-        send_otp_email(user, template="email_verification.html")
-        return CustomResponse.success("Verification code sent successfully. Please check your mail")
+        # Generate OTP secret for the user
+        otp_secret = pyotp.random_base32()
+
+        send_otp_email(otp_secret=otp_secret, recipient=user, template="email_verification.html")
+
+        data = {'otp_secret': otp_secret}
+        return CustomResponse.success("Verification code sent successfully. Please check your mail", data=data)
 
 
 class SendNewEmailVerificationCodeView(APIView):
@@ -364,8 +355,7 @@ class SendNewEmailVerificationCodeView(APIView):
         tags=['Email Change'],
         responses={
             status.HTTP_200_OK: OpenApiResponse(
-                response={"status": "success",
-                          "message": "Verification code sent successfully. Please check your new email."},
+                response={"application/json"},
                 description="Verification code sent successfully. Please check your new email.",
                 examples=[
                     OpenApiExample(
@@ -378,8 +368,7 @@ class SendNewEmailVerificationCodeView(APIView):
                 ]
             ),
             status.HTTP_409_CONFLICT: OpenApiResponse(
-                response={"status": "failure", "message": "Account with this email already exists",
-                          "code": "already_exists"},
+                response={"application/json"},
                 description="Account with this email already exists",
                 examples=[
                     OpenApiExample(
@@ -402,9 +391,13 @@ class SendNewEmailVerificationCodeView(APIView):
         # Check if user with the same username or email exists
         get_existing_user(email=email)
 
+        otp_secret = pyotp.random_base32()
+
         # send email if the email is new
-        send_otp_email(request.user, template="email_change.html")
-        return CustomResponse.success("Verification code sent successfully. Please check your mail")
+        send_otp_email(otp_secret=otp_secret, recipient=email, template="email_change.html")
+
+        data = {'otp_secret': otp_secret}
+        return CustomResponse.success("Verification code sent successfully. Please check your mail", data=data)
 
 
 class ChangeEmailView(APIView):
@@ -419,11 +412,13 @@ class ChangeEmailView(APIView):
 
         - `email_address`: The user's new email address.
         - `otp`: The code sent
+        
+        Pass in the otp secret you got from the previous endpoint
         """,
         tags=['Email Change'],
         responses={
             status.HTTP_200_OK: OpenApiResponse(
-                response={"status": "success", "message": "Email changed successfully."},
+                response={"application/json"},
                 description="Email changed successfully.",
                 examples=[
                     OpenApiExample(
@@ -436,7 +431,7 @@ class ChangeEmailView(APIView):
                 ]
             ),
             status.HTTP_403_FORBIDDEN: OpenApiResponse(
-                response={"status": "failure", "message": "You can't use your previous email", "code": "old_email"},
+                response={"application/json"},
                 description="You can't use your previous email",
                 examples=[
                     OpenApiExample(
@@ -450,7 +445,7 @@ class ChangeEmailView(APIView):
                 ]
             ),
             status.HTTP_400_BAD_REQUEST: OpenApiResponse(
-                response={"status": "failure", "message": "Invalid OTP", "code": "incorrect_otp"},
+                response={"application/json"},
                 description="OTP Error",
                 examples=[
                     OpenApiExample(
@@ -460,36 +455,15 @@ class ChangeEmailView(APIView):
                             "message": "Invalid OTP",
                             "code": "incorrect_otp"
                         }
-                    ),
-                    OpenApiExample(
-                        name="Expired OTP response",
-                        value={
-                            "status": "failure",
-                            "message": "OTP has expired",
-                            "code": "expired_otp"
-                        }
                     )
-                ]
-            ),
-            status.HTTP_404_NOT_FOUND: OpenApiResponse(
-                response={"status": "failure", "message": "Not found", "code": "non_existent"},
-                description="Not OTP found",
-                examples=[
-                    OpenApiExample(
-                        name="No otp found response",
-                        value={
-                            "status": "failure",
-                            "message": "No OTP found for this account",
-                            "code": "non_existent"
-                        }
-                    ),
-
                 ]
             )
         }
     )
     @transaction.atomic()
-    def post(self, request):
+    def post(self, request, *args, **kwargs):
+        otp_secret = kwargs.get('otp_secret')
+
         serializer = self.serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -497,21 +471,14 @@ class ChangeEmailView(APIView):
         otp = serializer.validated_data.get('otp')
         user = request.user
 
-        otp_secret = get_otp_secret(user=user)
+        otp_verification(otp_secret=otp_secret, code=code)
 
         if user.email == new_email:
             raise RequestError(err_code=ErrorCode.OLD_EMAIL, err_msg="You can't use your previous email",
                                status_code=status.HTTP_403_FORBIDDEN)
 
-        # Check if the OTP secret has expired (10 minutes interval)
-        verify_otp_expiration(otp_secret=otp_secret)
-
-        # Verify the OTP
-        verify_otp(otp_secret=otp_secret, code=otp)
-
         user.email = new_email
         user.save()
-        user.otp_secret.delete()
 
         return CustomResponse.success(message="Email changed successfully.")
 
@@ -522,7 +489,8 @@ class LoginView(TokenObtainPairView):
 
     @extend_schema(
         summary="Login",
-        description="""
+        description=
+        """
         This endpoint authenticates a registered and verified user and provides the necessary authentication tokens.
         """,
         request=LoginSerializer,
@@ -583,7 +551,7 @@ class LoginView(TokenObtainPairView):
                 ]
             ),
             status.HTTP_400_BAD_REQUEST: OpenApiResponse(
-                response={"status": "failure", "message": "Verify your email first", "code": "invalid_credentials"},
+                response={'application/json'},
                 description="Invalid credentials",
                 examples=[
                     OpenApiExample(
@@ -597,7 +565,7 @@ class LoginView(TokenObtainPairView):
                 ]
             ),
             status.HTTP_401_UNAUTHORIZED: OpenApiResponse(
-                response={"status": "failure", "message": "Invalid credentials", "code": "invalid_credentials"},
+                response={'application/json'},
                 description="Invalid credentials",
                 examples=[
                     OpenApiExample(
@@ -627,7 +595,8 @@ class LoginView(TokenObtainPairView):
         check_email_verification(user)
 
         user_profile = get_user_profile(user, is_agent)
-        return generate_response(user, user_profile)
+        response_data = {"tokens": user.tokens(), "profile_data": user_profile.data}
+        return CustomResponse.success(message="Logged in successfully", data=response_data)
 
 
 class LogoutView(TokenBlacklistView):
@@ -644,8 +613,7 @@ class LogoutView(TokenBlacklistView):
         tags=['Logout'],
         responses={
             status.HTTP_400_BAD_REQUEST: OpenApiResponse(
-                response={"status": "failure", "message": "Token is blacklisted", "code": "invalid_entry"},
-
+                response={'application/json'},
                 description="Token is blacklisted",
                 examples=[
                     OpenApiExample(
@@ -659,7 +627,7 @@ class LogoutView(TokenBlacklistView):
                 ]
             ),
             status.HTTP_200_OK: OpenApiResponse(
-                response={"status": "success", "message": "Logged out successfully"},
+                response={'application/json'},
                 description="Logged out successfully",
                 examples=[
                     OpenApiExample(
@@ -704,8 +672,13 @@ class RefreshView(TokenRefreshView):
 
     )
     def post(self, request):
-        serializer = self.serializer_class(data=request.data)
-        serializer.is_valid(raise_exception=True)
+        try:
+            serializer = self.serializer_class(data=request.data)
+            serializer.is_valid(raise_exception=True)
+        except TokenError:
+            raise RequestError(err_code=ErrorCode.INVALID_ENTRY, err_msg="Error refreshing token",
+                               status_code=status.HTTP_400_BAD_REQUEST)
+
         access_token = serializer.validated_data['access']
         return CustomResponse.success(message="Refreshed successfully", data=access_token)
 
@@ -721,11 +694,12 @@ class RequestForgotPasswordCodeView(APIView):
         The request should include the following data:
 
         - `email`: The user's email address.
+        This will also return to you an otp secret that you can use to reset your password.
         """,
         tags=['Password Change'],
         responses={
             status.HTTP_404_NOT_FOUND: OpenApiResponse(
-                response={"status": "failure", "message": "Account not found", "code": "non_existent"},
+                response={'application/json'},
                 description="Account not found",
                 examples=[
                     OpenApiExample(
@@ -739,7 +713,7 @@ class RequestForgotPasswordCodeView(APIView):
                 ]
             ),
             status.HTTP_200_OK: OpenApiResponse(
-                response={"status": "success", "message": "Password code sent successfully"},
+                response={'application/json'},
                 description="Password code sent successfully",
                 examples=[
                     OpenApiExample(
@@ -752,7 +726,6 @@ class RequestForgotPasswordCodeView(APIView):
                 ]
             )
         }
-
     )
     def post(self, request):
         serializer = self.serializer_class(data=request.data)
@@ -761,8 +734,15 @@ class RequestForgotPasswordCodeView(APIView):
 
         user = get_user(email=email)
 
-        send_otp_email(user, "forgot_password.html")
-        return CustomResponse.success(message="Password code sent successfully")
+        # Generate OTP secret for the user
+        otp_secret = pyotp.random_base32()
+
+        send_otp_email(otp_secret=otp_secret, recipient=user, template="forgot_password.html")
+
+        data = {
+            "otp_secret": otp_secret
+        }
+        return CustomResponse.success(message="Password code sent successfully", data=data)
 
 
 class VerifyForgotPasswordCodeView(APIView):
@@ -784,7 +764,7 @@ class VerifyForgotPasswordCodeView(APIView):
         tags=['Password Change'],
         responses={
             status.HTTP_200_OK: OpenApiResponse(
-                response={"status": "success", "message": "Otp verified successfully."},
+                response={'application/json'},
                 description="Otp verified successfully.",
                 examples=[
                     OpenApiExample(
@@ -798,7 +778,7 @@ class VerifyForgotPasswordCodeView(APIView):
                 ]
             ),
             status.HTTP_400_BAD_REQUEST: OpenApiResponse(
-                response={"status": "failure", "message": "Invalid OTP", "code": "incorrect_otp"},
+                response={'application/json'},
                 description="OTP Error",
                 examples=[
                     OpenApiExample(
@@ -808,19 +788,11 @@ class VerifyForgotPasswordCodeView(APIView):
                             "message": "Invalid OTP",
                             "code": "incorrect_otp"
                         }
-                    ),
-                    OpenApiExample(
-                        name="Expired OTP response",
-                        value={
-                            "status": "failure",
-                            "message": "OTP has expired",
-                            "code": "expired_otp"
-                        }
                     )
                 ]
             ),
             status.HTTP_404_NOT_FOUND: OpenApiResponse(
-                response={"status": "failure", "message": "Not found", "code": "non_existent"},
+                response={'application/json'},
                 description="Not found",
                 examples=[
                     OpenApiExample(
@@ -830,28 +802,14 @@ class VerifyForgotPasswordCodeView(APIView):
                             "message": "User with this email not found",
                             "code": "non_existent"
                         }
-                    ),
-                    OpenApiExample(
-                        name="No otp found response",
-                        value={
-                            "status": "failure",
-                            "message": "No OTP found for this account",
-                            "code": "non_existent"
-                        }
-                    ),
-                    OpenApiExample(
-                        name="No OTP secret found response",
-                        value={
-                            "status": "failure",
-                            "message": "No OTP secret found for this account",
-                            "code": "non_existent"
-                        }
                     )
                 ]
             )
         }
     )
-    def post(self, request):
+    def post(self, request, *args, **kwargs):
+        otp_secret = kwargs.get('otp_secret')
+
         serializer = self.serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -860,13 +818,7 @@ class VerifyForgotPasswordCodeView(APIView):
 
         user = get_user(email=email)
 
-        otp_secret = get_otp_secret(user)
-
-        # Check if the OTP secret has expired (10 minutes interval)
-        verify_otp_expiration(otp_secret=otp_secret)
-
-        # Verify the OTP
-        verify_otp(otp_secret=otp_secret, code=code)
+        otp_verification(otp_secret=otp_secret, code=code)
 
         token = encrypt_profile_to_token(user)  # Encrypt the user profile to a token.
         return CustomResponse.success(message="Otp verified successfully", data=token)
@@ -888,7 +840,7 @@ class ChangeForgottenPasswordView(APIView):
         tags=['Password Change'],
         responses={
             status.HTTP_202_ACCEPTED: OpenApiResponse(
-                response={"status": "success", "message": "Password updated successfully."},
+                response={'application/json'},
                 description="Password updated successfully",
                 examples=[
                     OpenApiExample(
@@ -934,7 +886,7 @@ class ChangePasswordView(APIView):
         tags=['Password Change'],
         responses={
             status.HTTP_202_ACCEPTED: OpenApiResponse(
-                response={"status": "success", "message": "Password updated successfully"},
+                response={'application/json'},
                 description="Password updated successfully",
                 examples=[
                     OpenApiExample(

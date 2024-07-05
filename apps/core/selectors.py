@@ -1,13 +1,8 @@
-from datetime import timedelta
-
 from django.contrib.auth import get_user_model, authenticate
-from django.utils import timezone
 from rest_framework import status
 
 from apps.common.errors import ErrorCode
 from apps.common.exceptions import RequestError
-from apps.common.responses import CustomResponse
-from apps.core.models import OTPSecret
 from apps.core.serializers import CompanyProfileSerializer, NormalProfileSerializer
 
 User = get_user_model()
@@ -35,11 +30,6 @@ def get_user_profile(user, is_agent):
         return NormalProfileSerializer(user.profile)
 
 
-def generate_response(user, user_profile):
-    response_data = {"tokens": user.tokens(), "profile_data": user_profile.data}
-    return CustomResponse.success(message="Logged in successfully", data=response_data)
-
-
 def get_existing_user(email):
     # Check if a user with the specified email exists
     try:
@@ -63,42 +53,7 @@ def get_existing_user(email):
 
 def get_user(email):
     try:
-        return User.objects.select_related('otp_secret').get(email=email)
+        return User.objects.get(email=email)
     except User.DoesNotExist:
         raise RequestError(err_code=ErrorCode.NON_EXISTENT, err_msg="User with this email not found",
-                           status_code=status.HTTP_404_NOT_FOUND)
-
-
-def get_otp_secret(user):
-    try:
-        return OTPSecret.objects.get(user=user)
-    except OTPSecret.DoesNotExist:
-        raise RequestError(err_code=ErrorCode.NON_EXISTENT, err_msg="No OTP found for this account",
-                           status_code=status.HTTP_404_NOT_FOUND)
-
-
-def verify_otp(otp_secret, code):
-    if otp_secret.code != code:
-        raise RequestError(err_code=ErrorCode.INCORRECT_OTP, err_msg="Invalid OTP",
-                           status_code=status.HTTP_400_BAD_REQUEST)
-
-
-def verify_otp_expiration(otp_secret):
-    current_time = timezone.now()
-    expiration_time = otp_secret.created + timedelta(minutes=10)
-    if current_time > expiration_time:
-        raise RequestError(err_code=ErrorCode.EXPIRED_OTP, err_msg="OTP has expired",
-                           status_code=status.HTTP_400_BAD_REQUEST)
-
-
-def validate_otp_secret_code(user, code):
-    try:
-        otp_secret = OTPSecret.objects.get(user=user)
-
-        # Verify the OTP
-        if otp_secret.code != code:
-            raise RequestError(err_code=ErrorCode.INCORRECT_OTP, err_msg="Invalid OTP",
-                               status_code=status.HTTP_400_BAD_REQUEST)
-    except OTPSecret.DoesNotExist:
-        raise RequestError(err_code=ErrorCode.NON_EXISTENT, err_msg="No OTP found for this account",
                            status_code=status.HTTP_404_NOT_FOUND)

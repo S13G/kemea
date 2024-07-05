@@ -24,7 +24,6 @@ class UserAdmin(BaseUserAdmin):
         "phone_number",
         "email_verified",
         "is_staff",
-        "is_active",
         "is_agent",
 
     )
@@ -34,7 +33,6 @@ class UserAdmin(BaseUserAdmin):
     list_filter = (
         "email",
         "is_staff",
-        "is_active",
     )
     list_per_page = 20
     fieldsets = (
@@ -54,7 +52,6 @@ class UserAdmin(BaseUserAdmin):
             {
                 "fields": (
                     "google_provider",
-                    "is_active",
                     "is_staff",
                     "is_agent",
                     "email_verified",
@@ -84,7 +81,6 @@ class UserAdmin(BaseUserAdmin):
                     "password1",
                     "password2",
                     "is_staff",
-                    "is_active",
                 ),
             },
         ),

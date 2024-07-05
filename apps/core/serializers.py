@@ -1,7 +1,7 @@
 from django.contrib.auth import get_user_model
 from django.core.validators import validate_email
 from rest_framework import serializers as sr
-
+from django.core import validators
 from apps.core.validators import validate_phone_number
 
 User = get_user_model()
@@ -28,7 +28,10 @@ class NormalRegisterSerializer(sr.Serializer):
     last_name = sr.CharField()
     email = sr.CharField(validators=[validate_email_address])
     phone_number = sr.CharField(validators=[validate_phone_number])
-    password = sr.CharField(write_only=True)
+    password = sr.CharField(max_length=20, write_only=True, min_length=8, validators=[validators.RegexValidator(
+        regex=r'[!@#$%^&*(),.?":{}|<>]',
+        message="Password must contain at least one special character."
+    )], default="Validpass#1234")
 
 
 class CompanyRegisterSerializer(sr.Serializer):
@@ -37,12 +40,15 @@ class CompanyRegisterSerializer(sr.Serializer):
     licence_number = sr.CharField()
     email = sr.CharField(validators=[validate_email_address])
     phone_number = sr.CharField(validators=[validate_phone_number])
-    password = sr.CharField(write_only=True)
+    password = sr.CharField(max_length=20, write_only=True, min_length=8, validators=[validators.RegexValidator(
+        regex=r'[!@#$%^&*(),.?":{}|<>]',
+        message="Password must contain at least one special character."
+    )], default="Validpass#1234")
 
 
 class VerifyEmailSerializer(sr.Serializer):
     email = sr.CharField(validators=[validate_email_address])
-    otp = sr.IntegerField()
+    otp = sr.CharField()
 
 
 class ResendEmailVerificationCodeSerializer(sr.Serializer):
@@ -55,7 +61,7 @@ class SendNewEmailVerificationCodeSerializer(sr.Serializer):
 
 class ChangeEmailSerializer(sr.Serializer):
     email = sr.CharField(validators=[validate_email_address])
-    otp = sr.IntegerField()
+    otp = sr.CharField()
 
 
 class NormalProfileSerializer(sr.Serializer):
@@ -144,7 +150,10 @@ class LoginSerializer(sr.Serializer):
 
 
 class ChangePasswordSerializer(sr.Serializer):
-    password = sr.CharField(max_length=50, min_length=6, write_only=True)
+    password = sr.CharField(max_length=20, min_length=8, write_only=True, validators=[validators.RegexValidator(
+        regex=r'[!@#$%^&*(),.?":{}|<>]',
+        message="Password must contain at least one special character."
+    )], default="Validpass#1234")
 
 
 class RequestNewPasswordCodeSerializer(sr.Serializer):
