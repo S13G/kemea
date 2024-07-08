@@ -9,6 +9,7 @@ urlpatterns_v1 = [
     path("auth/", include("apps.core.urls")),
     path("property/", include("apps.property.urls")),
     path("social_auth/", include("apps.social_auth.urls")),
+    path("misc/", include("apps.misc.urls")),
 ]
 
 urlpatterns = [
