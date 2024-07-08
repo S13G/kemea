@@ -20,7 +20,7 @@ class RetrievePoliciesView(APIView):
         e.g. fr, en, es, etc.
         """,
         parameters=[
-            OpenApiParameter(name='lang', description='Language of the policy', required=True, type=OpenApiTypes.STR)
+            OpenApiParameter(name='lang', description='Language of the policy', type=OpenApiTypes.STR)
         ],
         tags=['Policy'],
         responses={
