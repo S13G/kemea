@@ -1,3 +1,4 @@
+import pyotp
 from django.db import transaction
 from drf_spectacular.utils import OpenApiResponse, extend_schema, OpenApiExample
 from rest_framework.permissions import IsAuthenticated
@@ -92,7 +93,7 @@ class NormalRegistrationView(APIView):
 
         data = {
             "secret": otp_secret,
-            "user_data": NormalProfileSerializer(employee_instance).data
+            "user_data": NormalProfileSerializer(user_profile).data
         }
 
         send_otp_email(otp_secret=otp_secret, recipient=user, template='email_verification.html')
@@ -108,7 +109,7 @@ class CompanyRegistrationView(APIView):
         description=(
                 """
                 This endpoint allows a user to register as an agent on the platform
-                This also returns to you the secret for the email which should be used for verification
+
                 This also returns to you the secret for the email which should be used for verification
                 """
         ),
@@ -168,7 +169,7 @@ class CompanyRegistrationView(APIView):
 
         data = {
             "secret": otp_secret,
-            "user_data": CompanyProfileSerializer(employee_instance).data
+            "user_data": CompanyProfileSerializer(user_profile).data
         }
 
         send_otp_email(otp_secret=otp_secret, recipient=user, template='email_verification.html')
@@ -471,7 +472,7 @@ class ChangeEmailView(APIView):
         otp = serializer.validated_data.get('otp')
         user = request.user
 
-        otp_verification(otp_secret=otp_secret, code=code)
+        otp_verification(otp_secret=otp_secret, code=otp)
 
         if user.email == new_email:
             raise RequestError(err_code=ErrorCode.OLD_EMAIL, err_msg="You can't use your previous email",
@@ -489,8 +490,7 @@ class LoginView(TokenObtainPairView):
 
     @extend_schema(
         summary="Login",
-        description=
-        """
+        description="""
         This endpoint authenticates a registered and verified user and provides the necessary authentication tokens.
         """,
         request=LoginSerializer,
@@ -967,8 +967,7 @@ class RetrieveUpdateProfileView(APIView):
 
     @extend_schema(
         summary="Update user profile",
-        description=
-        """
+        description="""
         This endpoint allows a user to update his/her user profile.
         """,
         tags=['Normal Profile'],

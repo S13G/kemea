@@ -139,7 +139,7 @@ class SearchAgentDashboardView(APIView):
         """,
         tags=['Agent Dashboard'],
         parameters=[
-            OpenApiParameter(name="search", description="Search query", required=False, type=OpenApiTypes.STR),
+            OpenApiParameter(name="search", description="Search query", type=OpenApiTypes.STR),
         ],
         responses={
             status.HTTP_200_OK: OpenApiResponse(
@@ -199,7 +199,7 @@ class RetrieveFilteredAdsView(APIView):
                 "This endpoint allows an authenticated normal user to filter properties."
         ),
         parameters=[
-            OpenApiParameter(name='ad_category', description="Type of ad category", required=False,
+            OpenApiParameter(name='ad_category', description="Type of ad category",
                              type=OpenApiTypes.STR, enum=AdCategory.objects.values_list('name', flat=True)),
         ],
         tags=['Property'],
@@ -606,24 +606,24 @@ class RetrieveUpdateCompanyProfileView(APIView):
         """,
         tags=['Company Profile'],
         parameters=[
-            OpenApiParameter(name='property_type', description="Type of property", required=False,
+            OpenApiParameter(name='property_type', description="Type of property",
                              type=OpenApiTypes.STR, enum=PropertyType.objects.values_list('name', flat=True)),
-            OpenApiParameter(name='price_min', description="Minimum price", required=False, type=OpenApiTypes.FLOAT),
-            OpenApiParameter(name='price_max', description="Maximum price", required=False, type=OpenApiTypes.FLOAT),
-            OpenApiParameter(name='surface_build_min', description="Minimum surface price", required=False,
+            OpenApiParameter(name='price_min', description="Minimum price", type=OpenApiTypes.FLOAT),
+            OpenApiParameter(name='price_max', description="Maximum price", type=OpenApiTypes.FLOAT),
+            OpenApiParameter(name='surface_build_min', description="Minimum surface price",
                              type=OpenApiTypes.FLOAT),
-            OpenApiParameter(name='surface_build_max', description="Maximum surface price", required=False,
+            OpenApiParameter(name='surface_build_max', description="Maximum surface price",
                              type=OpenApiTypes.FLOAT),
-            OpenApiParameter(name='rooms', description="Number of rooms", required=False, type=OpenApiTypes.INT),
-            OpenApiParameter(name='floors', description="Number of floors", required=False, type=OpenApiTypes.INT),
-            OpenApiParameter(name='features', description="Features", required=False, type=OpenApiTypes.STR,
+            OpenApiParameter(name='rooms', description="Number of rooms", type=OpenApiTypes.INT),
+            OpenApiParameter(name='floors', description="Number of floors", type=OpenApiTypes.INT),
+            OpenApiParameter(name='features', description="Features", type=OpenApiTypes.STR,
                              enum=PropertyFeature.objects.values_list('name', flat=True), many=True),
             OpenApiParameter(name='last_week', description="Filter by properties posted in the last week",
-                             required=False, type=OpenApiTypes.BOOL),
+                             type=OpenApiTypes.BOOL),
             OpenApiParameter(name='last_month', description="Filter by properties posted in the last month",
-                             required=False, type=OpenApiTypes.BOOL),
+                             type=OpenApiTypes.BOOL),
             OpenApiParameter(name='last_24_hours', description="Filter by properties posted in the last 24 hours",
-                             required=False, type=OpenApiTypes.BOOL),
+                             type=OpenApiTypes.BOOL),
         ],
         responses={
             status.HTTP_200_OK: OpenApiResponse(
@@ -1341,12 +1341,12 @@ class RetrieveAllPropertyAdListingView(APIView):
             """,
         tags=['Property'],
         parameters=[
-            OpenApiParameter(name='ad_category', description="Type of ad category", required=False,
+            OpenApiParameter(name='ad_category', description="Type of ad category",
                              type=OpenApiTypes.STR, enum=AdCategory.objects.values_list('name', flat=True)),
-            OpenApiParameter(name='property_type', description="Type of property", required=False,
+            OpenApiParameter(name='property_type', description="Type of property",
                              type=OpenApiTypes.STR, enum=PropertyType.objects.values_list('name', flat=True)),
-            OpenApiParameter(name='price_min', description="Minimum price", required=False, type=OpenApiTypes.FLOAT),
-            OpenApiParameter(name='price_max', description="Maximum price", required=False, type=OpenApiTypes.FLOAT),
+            OpenApiParameter(name='price_min', description="Minimum price", type=OpenApiTypes.FLOAT),
+            OpenApiParameter(name='price_max', description="Maximum price", type=OpenApiTypes.FLOAT),
         ],
         responses={
             status.HTTP_200_OK: OpenApiResponse(

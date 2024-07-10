@@ -3,6 +3,7 @@ from rest_framework import status
 
 from apps.common.errors import ErrorCode
 from apps.common.exceptions import RequestError
+from apps.core.emails import decode_otp_from_secret
 from apps.core.serializers import CompanyProfileSerializer, NormalProfileSerializer
 
 User = get_user_model()
@@ -57,3 +58,11 @@ def get_user(email):
     except User.DoesNotExist:
         raise RequestError(err_code=ErrorCode.NON_EXISTENT, err_msg="User with this email not found",
                            status_code=status.HTTP_404_NOT_FOUND)
+
+
+def otp_verification(otp_secret: str, code: str):
+    otp = decode_otp_from_secret(otp_secret=otp_secret)
+
+    if otp != code:
+        raise RequestError(err_code=ErrorCode.INCORRECT_OTP, err_msg="Invalid OTP",
+                           status_code=status.HTTP_400_BAD_REQUEST)

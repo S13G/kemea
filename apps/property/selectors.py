@@ -1,6 +1,6 @@
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError
-from django.db.models import Q
+from django.db.models import Q, QuerySet
 from rest_framework import status
 
 from apps.common.errors import ErrorCode
@@ -13,7 +13,7 @@ from apps.property.serializers import PropertyAdSerializer
 User = get_user_model()
 
 
-def get_dashboard_details(user: User) -> Property:
+def get_dashboard_details(user: User) -> QuerySet[Property]:
     return Property.objects.filter(lister=user) \
         .values('id', 'name', 'property_type__name', 'ad_category__name', 'ad_status') \
         .order_by('-created')
