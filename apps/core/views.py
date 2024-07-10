@@ -182,11 +182,8 @@ class VerifyEmailView(APIView):
     @extend_schema(
         summary="Email verification",
         description="""
-        This endpoint allows a registered user to verify their email address with an OTP.
-        The request should include the following data:
-
-        - `email_address`: The user's email address.
-        Pass in the uidb64 and token generated
+        This endpoint allows a registered user to verify their email address with the email link.
+        Pass in the uidb64 and token generated or sent to the email address 
         """,
         tags=['Email Verification'],
         responses={
@@ -221,6 +218,20 @@ class VerifyEmailView(APIView):
                             "status": "failure",
                             "message": "User with this email not found",
                             "code": "non_existent"
+                        }
+                    )
+                ]
+            ),
+            status.HTTP_400_BAD_REQUEST: OpenApiResponse(
+                response={"application/json"},
+                description="The link is invalid",
+                examples=[
+                    OpenApiExample(
+                        name="Invalid link response",
+                        value={
+                            "status": "failure",
+                            "message": "The link is invalid",
+                            "code": "other_error"
                         }
                     )
                 ]
