@@ -3,18 +3,12 @@ from django.urls import path
 from apps.core import views
 
 urlpatterns = [
-    path('verify/email/<str:otp_secret>', views.VerifyEmailView.as_view(), name="verify-email"),
+    path('verify/email/<str:uidb64>/<str:token>', views.VerifyEmailView.as_view(), name="verify-email"),
     path(
         'resend/email/verify/code/resend',
-        views.ResendEmailVerificationCodeView.as_view(),
+        views.ResendEmailVerificationLinkView.as_view(),
         name="resend-email-verification-code"
     ),
-    path(
-        'new-email/verify/code',
-        views.SendNewEmailVerificationCodeView.as_view(),
-        name="send-new-email-verification-code"
-    ),
-    path('change/email/<str:otp_secret>', views.ChangeEmailView.as_view(), name="change-email"),
     path('login', views.LoginView.as_view(), name="login"),
     path('logout', views.LogoutView.as_view(), name="logout"),
     path('refresh/token', views.RefreshView.as_view(), name="refresh-token"),

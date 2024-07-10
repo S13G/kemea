@@ -1,5 +1,7 @@
 import pyotp
 from django.db import transaction
+from django.utils.encoding import force_str
+from django.utils.http import urlsafe_base64_decode
 from drf_spectacular.utils import OpenApiResponse, extend_schema, OpenApiExample
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
@@ -11,10 +13,11 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenBlacklistVi
 
 from apps.common.permissions import IsAuthenticatedUser
 from apps.common.responses import CustomResponse
-from apps.core.emails import send_otp_email
+from apps.core.emails import send_email_verification, send_otp_email
 from apps.core.models import NormalProfile, CompanyProfile
 from apps.core.selectors import *
 from apps.core.serializers import *
+from apps.core.tokens import account_activation_token
 from utilities.encryption import decrypt_token_to_profile, encrypt_profile_to_token
 
 User = get_user_model()
@@ -88,15 +91,11 @@ class NormalRegistrationView(APIView):
             raise RequestError(err_code=ErrorCode.OTHER_ERROR, err_msg=str(e),
                                status_code=status.HTTP_400_BAD_REQUEST)
 
-            # Generate one time otp secret
-        otp_secret = pyotp.random_base32()
-
         data = {
-            "secret": otp_secret,
             "user_data": NormalProfileSerializer(user_profile).data
         }
 
-        send_otp_email(otp_secret=otp_secret, recipient=user, template='email_verification.html')
+        send_email_verification(request=request, recipient=user, template='email_verification.html')
         return CustomResponse.success(message="Registration successful, check your email for verification.",
                                       status_code=status.HTTP_201_CREATED, data=data)
 
@@ -164,15 +163,11 @@ class CompanyRegistrationView(APIView):
             raise RequestError(err_code=ErrorCode.OTHER_ERROR, err_msg=str(e),
                                status_code=status.HTTP_400_BAD_REQUEST)
 
-        # Generate one time otp secret
-        otp_secret = pyotp.random_base32()
-
         data = {
-            "secret": otp_secret,
             "user_data": CompanyProfileSerializer(user_profile).data
         }
 
-        send_otp_email(otp_secret=otp_secret, recipient=user, template='email_verification.html')
+        send_email_verification(request=request, recipient=user, template='email_verification.html')
         return CustomResponse.success(message="Registration successful, check your email for verification.",
                                       status_code=status.HTTP_201_CREATED, data=data)
 
@@ -183,7 +178,6 @@ AUTHENTICATION AND VERIFICATION OPTIONS
 
 
 class VerifyEmailView(APIView):
-    serializer_class = VerifyEmailSerializer
 
     @extend_schema(
         summary="Email verification",
@@ -192,8 +186,7 @@ class VerifyEmailView(APIView):
         The request should include the following data:
 
         - `email_address`: The user's email address.
-        - `otp`: The otp sent to the user's email address.
-        Pass in the email otp secret generated in the registration endpoint
+        Pass in the uidb64 and token generated
         """,
         tags=['Email Verification'],
         responses={
@@ -218,20 +211,6 @@ class VerifyEmailView(APIView):
                     )
                 ]
             ),
-            status.HTTP_400_BAD_REQUEST: OpenApiResponse(
-                response={"application/json"},
-                description="OTP Error",
-                examples=[
-                    OpenApiExample(
-                        name="Invalid OTP response",
-                        value={
-                            "status": "failure",
-                            "message": "Invalid OTP",
-                            "code": "incorrect_otp"
-                        }
-                    )
-                ]
-            ),
             status.HTTP_404_NOT_FOUND: OpenApiResponse(
                 response={"application/json"},
                 description="Not found",
@@ -248,36 +227,38 @@ class VerifyEmailView(APIView):
             )
         }
     )
-    def post(self, request, *args, **kwargs):
-        otp_secret = kwargs.get('otp_secret')
+    def get(self, request, *args, **kwargs):
+        uidb64 = kwargs.get('uidb64')
+        token = kwargs.get('token')
 
-        serializer = self.serializer_class(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        email = serializer.validated_data.get('email')
-        code = request.data.get('otp')
-
-        user = get_user(email=email)
+        try:
+            uid = force_str(urlsafe_base64_decode(uidb64))
+            user = User.objects.get(id=uid)
+        except(TypeError, ValueError, OverflowError, User.DoesNotExist):
+            user = None
 
         if user.email_verified:
             raise RequestError(err_code=ErrorCode.VERIFIED_USER, err_msg="Email verified already",
                                status_code=status.HTTP_200_OK)
 
-        otp_verification(otp_secret=otp_secret, code=code)
-
-        # OTP verification successful
-        user.email_verified = True
-        user.save()
+        if user and account_activation_token.check_token(user, token):
+            # OTP verification successful
+            user.email_verified = True
+            user.save()
+        else:
+            raise RequestError(err_code=ErrorCode.OTHER_ERROR, err_msg='The link is invalid',
+                               status_code=status.HTTP_400_BAD_REQUEST)
 
         return CustomResponse.success(message="Email verification successful.")
 
 
-class ResendEmailVerificationCodeView(APIView):
-    serializer_class = ResendEmailVerificationCodeSerializer
+class ResendEmailVerificationLinkView(APIView):
+    serializer_class = ResendEmailVerificationLinkSerializer
 
     @extend_schema(
-        summary="Send / resend email verification code",
+        summary="Send / resend email verification link",
         description="""
-        This endpoint allows a registered user to send or resend email verification code to their registered email address.
+        This endpoint allows a registered user to send or resend email verification link to their registered email address.
         The request should include the following data:
 
         - `email_address`: The user's email address.
@@ -286,13 +267,13 @@ class ResendEmailVerificationCodeView(APIView):
         responses={
             status.HTTP_200_OK: OpenApiResponse(
                 response={"application/json"},
-                description="Verification code sent successfully. Please check your mail.",
+                description="Verification link sent successfully. Please check your mail.",
                 examples=[
                     OpenApiExample(
                         name="Verification successful response",
                         value={
                             "status": "success",
-                            "message": "Verification code sent successfully. Please check your mail."
+                            "message": "Verification link sent successfully. Please check your mail."
                         }
                     ),
                     OpenApiExample(
@@ -332,156 +313,9 @@ class ResendEmailVerificationCodeView(APIView):
             raise RequestError(err_code=ErrorCode.VERIFIED_USER, err_msg="Email already verified",
                                status_code=status.HTTP_200_OK)
 
-        # Generate OTP secret for the user
-        otp_secret = pyotp.random_base32()
+        send_email_verification(request=request, recipient=user, template='email_verification.html')
 
-        send_otp_email(otp_secret=otp_secret, recipient=user, template="email_verification.html")
-
-        data = {'otp_secret': otp_secret}
-        return CustomResponse.success("Verification code sent successfully. Please check your mail", data=data)
-
-
-class SendNewEmailVerificationCodeView(APIView):
-    permission_classes = (IsAuthenticated,)
-    serializer_class = SendNewEmailVerificationCodeSerializer
-
-    @extend_schema(
-        summary="Send email change verification code",
-        description="""
-        This endpoint allows an authenticated user to send a verification code to new email they want to change to.
-        The request should include the following data:
-
-        - `email_address`: The user's new email address.
-        """,
-        tags=['Email Change'],
-        responses={
-            status.HTTP_200_OK: OpenApiResponse(
-                response={"application/json"},
-                description="Verification code sent successfully. Please check your new email.",
-                examples=[
-                    OpenApiExample(
-                        name="Verification successful response",
-                        value={
-                            "status": "success",
-                            "message": "Verification code sent successfully. Please check your new email."
-                        }
-                    )
-                ]
-            ),
-            status.HTTP_409_CONFLICT: OpenApiResponse(
-                response={"application/json"},
-                description="Account with this email already exists",
-                examples=[
-                    OpenApiExample(
-                        name="Conflict response",
-                        value={
-                            "status": "failure",
-                            "message": "Account with this email already exists",
-                            "code": "already_exists"
-                        }
-                    )
-                ]
-            )
-        }
-    )
-    def post(self, request):
-        serializer = self.serializer_class(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        email = serializer.validated_data.get('email')
-
-        # Check if user with the same username or email exists
-        get_existing_user(email=email)
-
-        otp_secret = pyotp.random_base32()
-
-        # send email if the email is new
-        send_otp_email(otp_secret=otp_secret, recipient=email, template="email_change.html")
-
-        data = {'otp_secret': otp_secret}
-        return CustomResponse.success("Verification code sent successfully. Please check your mail", data=data)
-
-
-class ChangeEmailView(APIView):
-    permission_classes = (IsAuthenticated,)
-    serializer_class = ChangeEmailSerializer
-
-    @extend_schema(
-        summary="Change account email address",
-        description="""
-        This endpoint allows an authenticated user to change their account's email address and user can change after 10 days.
-        The request should include the following data:
-
-        - `email_address`: The user's new email address.
-        - `otp`: The code sent
-        
-        Pass in the otp secret you got from the previous endpoint
-        """,
-        tags=['Email Change'],
-        responses={
-            status.HTTP_200_OK: OpenApiResponse(
-                response={"application/json"},
-                description="Email changed successfully.",
-                examples=[
-                    OpenApiExample(
-                        name="Successful response",
-                        value={
-                            "status": "success",
-                            "message": "Email changed successfully."
-                        }
-                    )
-                ]
-            ),
-            status.HTTP_403_FORBIDDEN: OpenApiResponse(
-                response={"application/json"},
-                description="You can't use your previous email",
-                examples=[
-                    OpenApiExample(
-                        name="Old email response",
-                        value={
-                            "status": "failure",
-                            "message": "You can't use your previous email",
-                            "code": "old_email"
-                        }
-                    )
-                ]
-            ),
-            status.HTTP_400_BAD_REQUEST: OpenApiResponse(
-                response={"application/json"},
-                description="OTP Error",
-                examples=[
-                    OpenApiExample(
-                        name="Invalid OTP response",
-                        value={
-                            "status": "failure",
-                            "message": "Invalid OTP",
-                            "code": "incorrect_otp"
-                        }
-                    )
-                ]
-            )
-        }
-    )
-    @transaction.atomic()
-    def post(self, request, *args, **kwargs):
-        otp_secret = kwargs.get('otp_secret')
-
-        serializer = self.serializer_class(data=request.data)
-        serializer.is_valid(raise_exception=True)
-
-        new_email = serializer.validated_data.get('email')
-        otp = serializer.validated_data.get('otp')
-        user = request.user
-
-        otp_verification(otp_secret=otp_secret, code=otp)
-
-        if user.email == new_email:
-            raise RequestError(err_code=ErrorCode.OLD_EMAIL, err_msg="You can't use your previous email",
-                               status_code=status.HTTP_403_FORBIDDEN)
-
-        user.email = new_email
-        user.save()
-
-        return CustomResponse.success(message="Email changed successfully.")
+        return CustomResponse.success("Verification link sent successfully. Please check your mail")
 
 
 class LoginView(TokenObtainPairView):

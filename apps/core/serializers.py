@@ -1,7 +1,8 @@
 from django.contrib.auth import get_user_model
+from django.core import validators
 from django.core.validators import validate_email
 from rest_framework import serializers as sr
-from django.core import validators
+
 from apps.core.validators import validate_phone_number
 
 User = get_user_model()
@@ -48,14 +49,9 @@ class CompanyRegisterSerializer(sr.Serializer):
 
 class VerifyEmailSerializer(sr.Serializer):
     email = sr.CharField(validators=[validate_email_address])
-    otp = sr.CharField()
 
 
-class ResendEmailVerificationCodeSerializer(sr.Serializer):
-    email = sr.CharField(validators=[validate_email_address])
-
-
-class SendNewEmailVerificationCodeSerializer(sr.Serializer):
+class ResendEmailVerificationLinkSerializer(sr.Serializer):
     email = sr.CharField(validators=[validate_email_address])
 
 
