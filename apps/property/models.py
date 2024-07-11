@@ -2,6 +2,7 @@ from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.db import models
+from django.db.models import UniqueConstraint
 
 from apps.common.models import BaseModel
 from apps.core.validators import validate_phone_number
@@ -14,7 +15,7 @@ User = get_user_model()
 # Create your models here.
 
 class AdCategory(BaseModel):
-    name = models.CharField(max_length=255)
+    name = models.CharField(max_length=255, unique=True)
 
     class Meta:
         verbose_name_plural = 'Ad Categories'
@@ -24,21 +25,21 @@ class AdCategory(BaseModel):
 
 
 class PropertyType(BaseModel):
-    name = models.CharField(max_length=255)
+    name = models.CharField(max_length=255, unique=True)
 
     def __str__(self):
         return self.name
 
 
 class PropertyState(BaseModel):
-    name = models.CharField(max_length=255)
+    name = models.CharField(max_length=255, unique=True)
 
     def __str__(self):
         return self.name
 
 
 class PropertyFeature(BaseModel):
-    name = models.CharField(max_length=255)
+    name = models.CharField(max_length=255, unique=True)
 
     def __str__(self):
         return self.name
@@ -84,7 +85,8 @@ class Property(BaseModel):
     @property
     def discounted_price(self):
         return round(
-            self.price - (self.price * Decimal((self.discount / 100))), 2) if self.discount > 0 else 'No discounted price'
+            self.price - (self.price * Decimal((self.discount / 100))),
+            2) if self.discount > 0 else 'No discounted price'
 
 
 class PropertyMedia(BaseModel):
@@ -102,7 +104,9 @@ class FavoriteProperty(BaseModel):
     objects = FavoritePropertyManager()
 
     class Meta:
-        unique_together = ('property', 'user')
+        constraints = [
+            UniqueConstraint(fields=['property', 'user'], name='unique_favorite_property')
+        ]
 
     def __str__(self):
         return self.user.full_name
