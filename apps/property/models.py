@@ -84,8 +84,7 @@ class Property(BaseModel):
     @property
     def discounted_price(self):
         return round(
-            self.price - (self.price * Decimal((self.discount / 100))) if self.discount > 0 else 'No discounted price',
-            2)
+            self.price - (self.price * Decimal((self.discount / 100))), 2) if self.discount > 0 else 'No discounted price'
 
 
 class PropertyMedia(BaseModel):
