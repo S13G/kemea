@@ -38,6 +38,7 @@ class PropertyFeatureAdmin(admin.ModelAdmin):
 class PropertyMediaInline(admin.TabularInline):
     model = PropertyMedia
     extra = 3
+    min_num = 1
 
 
 @admin.register(Property)
