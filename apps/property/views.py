@@ -196,7 +196,7 @@ class RetrieveFilteredAdsView(APIView):
     @extend_schema(
         summary="Filter property ads",
         description=(
-                "This endpoint allows an authenticated normal user to filter properties."
+                "This endpoint allows an authenticated agent user to filter properties."
         ),
         parameters=[
             OpenApiParameter(name='ad_category', description="Type of ad category",
@@ -1215,7 +1215,6 @@ class CreateDeleteFavoritePropertyView(APIView):
 
 
 class RetrievePropertyAdDetailsView(APIView):
-    permission_classes = [IsAuthenticated]
     serializer_class = CreatePropertyAdSerializer
 
     @extend_schema(

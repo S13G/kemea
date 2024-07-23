@@ -114,7 +114,7 @@ class FavoritePropertySerializer(sr.Serializer):
 
     @staticmethod
     def get_lister_phone_number(obj):
-        return obj.lister.phone_number
+        return obj.property.lister.phone_number
 
     @staticmethod
     def get_feature_names(obj):
